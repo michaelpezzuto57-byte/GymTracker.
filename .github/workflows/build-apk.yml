@@ -30,7 +30,7 @@ jobs:
           gradle-version: '8.9'
 
       - name: Extract Android project
-        run: unzip -o GymTrackerNative.zip -d project
+       run: unzip -o GymTrackerNative_Updated.zip -d project
 
       - name: Find Android project
         run: |
