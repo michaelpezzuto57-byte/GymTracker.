@@ -30,7 +30,7 @@ jobs:
           gradle-version: '8.9'
 
       - name: Extract Android project
-       run: unzip -o GymTrackerNative_Updated.zip -d project
+        run: unzip -o GymTrackerNative_Updated.zip -d project
 
       - name: Find Android project
         run: |
@@ -40,37 +40,11 @@ jobs:
             exit 1
           fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-
-      - name: Fix Java and Kotlin versions
-        run: |
-          python3 - <<'PY'
-          import os
-          from pathlib import Path
-
-          project = Path(os.environ["PROJECT_DIR"])
-          file = project / "app" / "build.gradle.kts"
-          content = file.read_text()
-
-          marker = "    buildFeatures { compose = true }"
-
-          replacement = """    compileOptions {
-              sourceCompatibility = JavaVersion.VERSION_17
-              targetCompatibility = JavaVersion.VERSION_17
-          }
-          kotlinOptions {
-              jvmTarget = "17"
-          }
-          buildFeatures { compose = true }"""
-
-          if marker not in content:
-              raise SystemExit("Impossibile trovare il punto da modificare")
-
-          file.write_text(content.replace(marker, replacement, 1))
-          print("Java e Kotlin configurati su JVM 17")
-          PY
+          echo "Project directory: $PROJECT_DIR"
 
       - name: Build APK
-        run: gradle -p "$PROJECT_DIR" assembleDebug
+        run: |
+          gradle -p "$PROJECT_DIR" assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
