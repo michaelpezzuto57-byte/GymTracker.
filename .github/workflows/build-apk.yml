@@ -34,38 +34,43 @@ jobs:
 
       - name: Find Android project
         run: |
-          PROJECT_DIR=$(dirname "$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -n 1)")
+          PROJECT_DIR=$(dirname "$(find project -type f -name settings.gradle.kts | head -n 1)")
           if [ -z "$PROJECT_DIR" ]; then
             echo "Android project not found"
             exit 1
           fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
-          echo "Project directory: $PROJECT_DIR"
 
-      - name: Configure Java and Kotlin targets
+      - name: Fix Java and Kotlin versions
         run: |
-          cat > "$RUNNER_TEMP/jvm-fix.gradle" <<'EOF'
-          allprojects {
-              tasks.withType(org.gradle.api.tasks.compile.JavaCompile).configureEach {
-                  sourceCompatibility = '17'
-                  targetCompatibility = '17'
-              }
-              tasks.configureEach {
-                  if (it.class.name.contains('KotlinCompile')) {
-                      it.kotlinOptions.jvmTarget = '17'
-                  }
-              }
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+
+          project = Path(os.environ["PROJECT_DIR"])
+          file = project / "app" / "build.gradle.kts"
+          content = file.read_text()
+
+          marker = "    buildFeatures { compose = true }"
+
+          replacement = """    compileOptions {
+              sourceCompatibility = JavaVersion.VERSION_17
+              targetCompatibility = JavaVersion.VERSION_17
           }
-          EOF
+          kotlinOptions {
+              jvmTarget = "17"
+          }
+          buildFeatures { compose = true }"""
+
+          if marker not in content:
+              raise SystemExit("Impossibile trovare il punto da modificare")
+
+          file.write_text(content.replace(marker, replacement, 1))
+          print("Java e Kotlin configurati su JVM 17")
+          PY
 
       - name: Build APK
-        run: |
-          if [ -f "$PROJECT_DIR/gradlew" ]; then
-            chmod +x "$PROJECT_DIR/gradlew"
-            "$PROJECT_DIR/gradlew" -I "$RUNNER_TEMP/jvm-fix.gradle" -p "$PROJECT_DIR" assembleDebug
-          else
-            gradle -I "$RUNNER_TEMP/jvm-fix.gradle" -p "$PROJECT_DIR" assembleDebug
-          fi
+        run: gradle -p "$PROJECT_DIR" assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
