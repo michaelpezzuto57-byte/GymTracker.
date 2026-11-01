@@ -13,6 +13,7 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Download repository
         uses: actions/checkout@v4
@@ -23,24 +24,36 @@ jobs:
           distribution: temurin
           java-version: '17'
 
-      
-      - name: Set up Android SDK
-        uses: android-actions/setup-android@v3
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
 
       - name: Extract Android project
-        run: unzip -o GymTrackerNative.zip -d extracted
+        run: unzip -o GymTrackerNative.zip -d project
 
-      - name: Show extracted files
-        run: find extracted -maxdepth 3 -type f | head -80
+      - name: Find Android project
+        run: |
+          PROJECT_DIR=$(dirname "$(find project -type f \( -name settings.gradle -o -name settings.gradle.kts \) | head -n 1)")
+          if [ -z "$PROJECT_DIR" ]; then
+            echo "Android project not found"
+            exit 1
+          fi
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Project directory: $PROJECT_DIR"
 
       - name: Build APK
         run: |
-          cd extracted
-          gradle assembleDebug
+          if [ -f "$PROJECT_DIR/gradlew" ]; then
+            chmod +x "$PROJECT_DIR/gradlew"
+            "$PROJECT_DIR/gradlew" -p "$PROJECT_DIR" assembleDebug
+          else
+            gradle -p "$PROJECT_DIR" assembleDebug
+          fi
 
       - name: Upload APK
-        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: Gym-Tracker-APK
-          path: extracted/**/build/outputs/apk/debug/*.apk
+          path: project/**/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
