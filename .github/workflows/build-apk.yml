@@ -29,9 +29,9 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract Android project
-        run: unzip -o GymTrackerNative_GraficaHome_v1.zip -d project
-        
+      - name: Extract updated Android project
+        run: unzip -o GymTracker_AquaDynamics_timer.zip -d project
+
       - name: Find Android project
         run: |
           PROJECT_DIR=$(dirname "$(find project -type f -name settings.gradle.kts | head -n 1)")
