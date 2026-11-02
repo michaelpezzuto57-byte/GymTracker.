@@ -5,7 +5,7 @@ on:
   workflow_dispatch:
   push:
     branches:
-      - principale
+      - main
 
 permissions:
   contents: read
