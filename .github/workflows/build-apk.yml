@@ -30,7 +30,7 @@ jobs:
           gradle-version: '8.9'
 
       - name: Extract updated Android project
-        run: unzip -o GymTracker_AquaDynamics_timer.zip -d project
+        run: unzip -o GymTracker_Grafica_integrata_v2.zip -d project
 
       - name: Find Android project
         run: |
