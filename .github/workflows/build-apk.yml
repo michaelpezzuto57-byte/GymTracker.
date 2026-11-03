@@ -1,4 +1,3 @@
-
 name: Build Gym Tracker APK
 
 on:
@@ -29,8 +28,8 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Extract updated Android project
-        run: unzip -o GymTracker_Grafica_integrata_v2.zip -d project
+      - name: Extract Racing Edition Android project
+        run: unzip -o GymTracker_Racing_Edition_Source.zip -d project
 
       - name: Find Android project
         run: |
