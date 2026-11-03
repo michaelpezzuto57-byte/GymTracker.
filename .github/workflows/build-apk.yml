@@ -40,6 +40,28 @@ jobs:
           fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
+      - name: Align Java and Kotlin JVM targets
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          gradle_file = Path(os.environ["PROJECT_DIR"]) / "app" / "build.gradle.kts"
+          content = gradle_file.read_text()
+          block = '''
+              compileOptions {
+                  sourceCompatibility = JavaVersion.VERSION_17
+                  targetCompatibility = JavaVersion.VERSION_17
+              }
+              kotlinOptions {
+                  jvmTarget = "17"
+              }
+          '''
+          if "sourceCompatibility = JavaVersion.VERSION_17" not in content:
+              content = content.replace("android {", "android {\n" + block, 1)
+          gradle_file.write_text(content)
+          print("Java and Kotlin targets set to 17 in", gradle_file)
+          PY
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
