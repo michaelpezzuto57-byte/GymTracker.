@@ -228,14 +228,6 @@ jobs:
           print("Integrated gymtracker_icon.jpg as the launcher icon without redesigning the artwork")
           PY
 
-      - name: Inspect workout source for weight selector patch
-        run: |
-          SOURCE="$PROJECT_DIR/app/src/main/java/it/gymtracker/app/MainActivity.kt"
-          echo "=== WorkoutScreen references ==="
-          grep -n -C 8 -E 'WorkoutScreen|fun WorkoutScreen|startIndex|timerActive|Text\("\$\{ex.reps\}' "$SOURCE" || true
-          echo "=== Relevant imports and declarations ==="
-          sed -n '1,100p' "$SOURCE"
-
       - name: Add per-set 5 kg weight selector
         run: |
           python3 - <<'PY'
@@ -244,10 +236,10 @@ jobs:
           source = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
           s = source.read_text()
 
-          old_call = '                    }, seconds, timerActive, { timerActive = false; seconds = 0 })'
-          new_call = '                    }, seconds, timerActive, { timerActive = false; seconds = 0 }, prefs)'
+          old_call = '                        context.stopService(Intent(context, RestTimerService::class.java))\n                    })\n                    "STORICO"'
+          new_call = '                        context.stopService(Intent(context, RestTimerService::class.java))\n                    }, prefs)\n                    "STORICO"'
           if s.count(old_call) != 1:
-              raise SystemExit("Could not locate WorkoutScreen call")
+              raise SystemExit("Could not locate end of WorkoutScreen call")
           s = s.replace(old_call, new_call)
 
           old_sig = '                          finish: (Boolean) -> Unit, seconds: Int, timerActive: Boolean, stopTimer: () -> Unit)'
