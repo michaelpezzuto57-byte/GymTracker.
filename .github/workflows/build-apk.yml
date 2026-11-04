@@ -227,6 +227,88 @@ jobs:
           print("Integrated gymtracker_icon.jpg as the launcher icon without redesigning the artwork")
           PY
 
+      - name: Add per-set 5 kg weight selector
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          source = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = source.read_text()
+
+          old_call = '                    }, seconds, timerActive, { timerActive = false; seconds = 0 })'
+          new_call = '                    }, seconds, timerActive, { timerActive = false; seconds = 0 }, prefs)'
+          if s.count(old_call) != 1:
+              raise SystemExit("Could not locate WorkoutScreen call to pass saved preferences")
+          s = s.replace(old_call, new_call)
+
+          old_sig = '                          finish: (Boolean) -> Unit, seconds: Int, timerActive: Boolean, stopTimer: () -> Unit) {'
+          new_sig = '                          finish: (Boolean) -> Unit, seconds: Int, timerActive: Boolean, stopTimer: () -> Unit, prefs: android.content.SharedPreferences) {'
+          if s.count(old_sig) != 1:
+              raise SystemExit("Could not locate WorkoutScreen signature")
+          s = s.replace(old_sig, new_sig)
+
+          old_state = '    val startIndex = exercises.take(selected).sumOf { it.sets }\n'
+          new_state = old_state + '    var weightDialogSet by remember(day, selected) { mutableIntStateOf(-1) }\n'
+          if s.count(old_state) != 1:
+              raise SystemExit("Could not locate exercise set index")
+          s = s.replace(old_state, new_state)
+
+          old_row = '''                    Text("${ex.reps} rip.", color = Muted, fontSize = 12.sp)
+                    Spacer(Modifier.width(8.dp))
+                    Text(if (checked) "✓" else "○", color = Red, fontSize = 22.sp, fontWeight = FontWeight.Black)'''
+          new_row = '''                    Text("${ex.reps} rip.", color = Muted, fontSize = 12.sp)
+                    Spacer(Modifier.width(5.dp))
+                    val savedWeight = prefs.getInt("weight_${day}_${selected}_${s}", 0)
+                    TextButton(onClick = { weightDialogSet = s }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp)) {
+                        Text(if (savedWeight > 0) "${savedWeight} kg" else "KG +", color = Red, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                    }
+                    Spacer(Modifier.width(3.dp))
+                    Text(if (checked) "✓" else "○", color = Red, fontSize = 22.sp, fontWeight = FontWeight.Black)'''
+          if s.count(old_row) != 1:
+              raise SystemExit("Could not locate set row to add weight selector")
+          s = s.replace(old_row, new_row)
+
+          old_after_list = '''            }
+        }
+        if (timerActive && seconds > 0) {'''
+          new_after_list = '''            }
+        }
+        if (weightDialogSet >= 0) {
+            val chosenSet = weightDialogSet
+            AlertDialog(
+                onDismissRequest = { weightDialogSet = -1 },
+                title = { Text("PESO • SERIE ${chosenSet + 1}", color = White, fontWeight = FontWeight.Black) },
+                text = {
+                    LazyColumn(Modifier.heightIn(max = 340.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                        itemsIndexed((1..40).toList()) { index, _ ->
+                            val kg = (index + 1) * 5
+                            TextButton(
+                                onClick = {
+                                    prefs.edit().putInt("weight_${day}_${selected}_${chosenSet}", kg).apply()
+                                    weightDialogSet = -1
+                                },
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text("${kg} KG", color = Red, fontSize = 17.sp, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+                containerColor = Panel,
+                titleContentColor = White,
+                textContentColor = White
+            )
+        }
+        if (timerActive && seconds > 0) {'''
+          if s.count(old_after_list) != 1:
+              raise SystemExit("Could not locate position after set list for weight menu")
+          s = s.replace(old_after_list, new_after_list)
+
+          source.write_text(s)
+          print("Added independent 5 kg increment selector (5–200 kg) for every set, saved locally")
+          PY
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
