@@ -31,6 +31,10 @@ jobs:
       - name: Extract Racing Edition Android project
         run: unzip -o GymTracker_Racing_Edition_Source.zip -d project
 
+      - name: Inspect original app structure
+        run: |
+          sed -n '1,280p' project/GymTrackerNative/app/src/main/java/it/gymtracker/app/MainActivity.kt
+
       - name: Find Android project
         run: |
           PROJECT_DIR="project/GymTrackerNative"
