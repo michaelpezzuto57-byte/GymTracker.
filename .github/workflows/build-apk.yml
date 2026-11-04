@@ -33,9 +33,10 @@ jobs:
 
       - name: Find Android project
         run: |
-          PROJECT_DIR=$(dirname "$(find project -type f -name settings.gradle.kts | head -n 1)")
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "Android project not found"
+          PROJECT_DIR="project/GymTrackerNative"
+          if [ ! -f "$PROJECT_DIR/settings.gradle.kts" ]; then
+            echo "Android project not found at $PROJECT_DIR"
+            find project -maxdepth 4 -type f -name 'settings.gradle*' -print
             exit 1
           fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
