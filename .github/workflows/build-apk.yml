@@ -136,6 +136,13 @@ jobs:
                                   prefs.edit().putLong(RestTimerService.KEY_END_AT, timerEndAt).apply()
                                   val serviceIntent = Intent(context, RestTimerService::class.java).putExtra(RestTimerService.EXTRA_END_AT, timerEndAt)
                                   ContextCompat.startForegroundService(context, serviceIntent)
+                                  // Start the real Android system timer without its setup screen.
+                                  val systemTimerIntent = Intent(android.provider.AlarmClock.ACTION_SET_TIMER).apply {
+                                      putExtra(android.provider.AlarmClock.EXTRA_LENGTH, 90)
+                                      putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, "Gym Tracker - Recupero")
+                                      putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
+                                  }
+                                  context.startActivity(systemTimerIntent)
                                   // Keep the user in Gym Tracker: the foreground service and in-app
                                   // countdown run the 90-second rest timer without opening Clock.
 
