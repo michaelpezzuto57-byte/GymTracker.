@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Set up Java
-        uses: actions/setup-java@v4
+        uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
@@ -60,6 +60,26 @@ jobs:
               content = content.replace("android {", "android {\n" + block, 1)
           gradle_file.write_text(content)
           print("Java and Kotlin targets set to 17 in", gradle_file)
+          PY
+
+      - name: Fix invalid outer layout weights
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          source = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          content = source.read_text()
+          old = "Column(Modifier.fillMaxWidth().weight(1f, fill = false))"
+          count = content.count(old)
+          if count != 2:
+              raise SystemExit(f"Expected 2 outer weighted Columns, found {count}")
+          content = content.replace(old, "Column(Modifier.fillMaxWidth())")
+          old_result = "Column(Modifier.fillMaxWidth().weight(1f), horizontalAlignment = Alignment.CenterHorizontally"
+          if content.count(old_result) != 1:
+              raise SystemExit("Could not uniquely locate ResultScreen outer Column")
+          content = content.replace(old_result, "Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally")
+          source.write_text(content)
+          print("Removed invalid weight modifiers from three outer Columns")
           PY
 
       - name: Build APK
