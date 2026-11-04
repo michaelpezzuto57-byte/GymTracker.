@@ -238,6 +238,7 @@ jobs:
           print("Integrated gymtracker_icon.jpg as the launcher icon without redesigning the artwork")
           PY
 
+      # Per-set weight selector: persisted independently for each exercise set.
       - name: Add per-set 5 kg weight selector
         run: |
           python3 - <<'PY'
