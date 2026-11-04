@@ -287,6 +287,86 @@ jobs:
           print("Added a saved 5 kg selector for each set (5–200 kg)")
           PY
 
+      - name: Add PESI screen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text()
+          old = '                    "STORICO" -> HistoryScreen(history, { history = ""; prefs.edit().remove("history").apply() })'
+          if s.count(old) != 1:
+              raise SystemExit("STORICO route not found uniquely")
+          s = s.replace(old, old + '\n                    "PESI" -> WeightsScreen(day, prefs)', 1)
+          s += """
+
+          @Composable
+          private fun WeightsScreen(day: String, prefs: android.content.SharedPreferences) {
+              var d by remember(day) { mutableStateOf(day) }
+              var editKey by remember { mutableStateOf<String?>(null) }
+              var manual by remember { mutableStateOf("") }
+              Column(Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                  Text("PESI", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                  Text("GESTISCI I TUOI CARICHI", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                  Spacer(Modifier.height(12.dp))
+                  Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                      listOf("A", "B", "C").forEach { x ->
+                          Button(onClick = { d = x }, modifier = Modifier.weight(1f),
+                              colors = ButtonDefaults.buttonColors(containerColor = if (d == x) Red else Panel2)) {
+                              Text("GIORNO $x", color = White)
+                          }
+                      }
+                  }
+                  Spacer(Modifier.height(10.dp))
+                  LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                      itemsIndexed(routines[d]!!) { i, ex ->
+                          val k = "load_${d}_${i}"
+                          val kg = prefs.getInt(k, 0)
+                          Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel)
+                              .border(1.dp, RedDark, RoundedCornerShape(12.dp))
+                              .clickable { editKey = k; manual = if (kg == 0) "" else kg.toString() }
+                              .padding(14.dp), verticalAlignment = Alignment.CenterVertically) {
+                              Column(Modifier.weight(1f)) {
+                                  Text(ex.name.replace("*", ""), color = White, fontWeight = FontWeight.Black)
+                                  Text("${ex.sets} SERIE • ${ex.reps} RIP.", color = Muted, fontSize = 10.sp)
+                              }
+                              Text(if (kg == 0) "IMPOSTA +" else "${kg} kg", color = Red, fontWeight = FontWeight.Black)
+                          }
+                      }
+                  }
+                  Text("SALVATAGGIO AUTOMATICO", color = Muted, fontSize = 9.sp,
+                      modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+              }
+              editKey?.let { k ->
+                  AlertDialog(onDismissRequest = { editKey = null },
+                      title = { Text("IMPOSTA PESO", color = White) },
+                      text = {
+                          Column {
+                              Text("Scegli il peso dal rullo oppure inserisci un valore.", color = Muted)
+                              LazyColumn(Modifier.heightIn(max = 190.dp)) {
+                                  itemsIndexed((0..200 step 5).toList()) { _, n ->
+                                      TextButton(onClick = { prefs.edit().putInt(k, n).apply(); editKey = null },
+                                          modifier = Modifier.fillMaxWidth()) {
+                                          Text("$n KG", color = Red, fontWeight = FontWeight.Bold)
+                                      }
+                                  }
+                              }
+                              OutlinedTextField(value = manual, onValueChange = { manual = it.filter(Char::isDigit).take(3) },
+                                  label = { Text("Peso manuale (kg)") }, singleLine = true)
+                              TextButton(onClick = {
+                                  manual.toIntOrNull()?.let { prefs.edit().putInt(k, it).apply(); editKey = null }
+                              }) { Text("SALVA PESO MANUALE", color = Red) }
+                          }
+                      },
+                      confirmButton = { TextButton(onClick = { editKey = null }) { Text("CHIUDI", color = White) } },
+                      containerColor = Panel)
+              }
+          }
+          """
+          p.write_text(s)
+          print("PESI screen added")
+          PY
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
