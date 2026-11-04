@@ -228,6 +228,14 @@ jobs:
           print("Integrated gymtracker_icon.jpg as the launcher icon without redesigning the artwork")
           PY
 
+      - name: Inspect workout source for weight selector patch
+        run: |
+          SOURCE="$PROJECT_DIR/app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          echo "=== WorkoutScreen references ==="
+          grep -n -C 8 -E 'WorkoutScreen|fun WorkoutScreen|startIndex|timerActive|Text\("\$\{ex.reps\}' "$SOURCE" || true
+          echo "=== Relevant imports and declarations ==="
+          sed -n '1,100p' "$SOURCE"
+
       - name: Add per-set 5 kg weight selector
         run: |
           python3 - <<'PY'
