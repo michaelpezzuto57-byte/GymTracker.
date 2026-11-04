@@ -235,6 +235,8 @@ jobs:
           import os
           source = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
           s = source.read_text()
+          if "import androidx.compose.foundation.lazy.items" not in s:
+              s = s.replace("import androidx.compose.foundation.lazy.LazyColumn", "import androidx.compose.foundation.lazy.LazyColumn\nimport androidx.compose.foundation.lazy.items", 1)
 
           old_call = '                        context.stopService(Intent(context, RestTimerService::class.java))\n                    })\n                    "STORICO"'
           new_call = '                        context.stopService(Intent(context, RestTimerService::class.java))\n                    }, prefs)\n                    "STORICO"'
