@@ -109,13 +109,7 @@ jobs:
           s = s.replace('import androidx.activity.compose.setContent', 'import androidx.activity.compose.setContent\nimport androidx.core.content.ContextCompat')
           s = s.replace('        super.onCreate(savedInstanceState)\n        setContent { RacingGymTracker(this) }', '        super.onCreate(savedInstanceState)\n        if (Build.VERSION.SDK_INT >= 33) requestPermissions(arrayOf(android.Manifest.permission.POST_NOTIFICATIONS), 7001)\n        setContent { RacingGymTracker(this) }')
           s = s.replace('    var seconds by remember { mutableIntStateOf(0) }\n    var timerActive by remember { mutableStateOf(false) }', '    var seconds by remember { mutableIntStateOf(0) }\n    var timerEndAt by remember { mutableLongStateOf(prefs.getLong(RestTimerService.KEY_END_AT, 0L)) }\n    var timerActive by remember { mutableStateOf(timerEndAt > System.currentTimeMillis()) }')
-          old = '''    LaunchedEffect(timerActive) {
-                  while (timerActive && seconds > 0) {
-                      delay(1000)
-                      seconds--
-                  }
-                  if (seconds <= 0) timerActive = false
-              }'''
+          import re
           new = '''    LaunchedEffect(timerEndAt) {
                   while (timerEndAt > 0L) {
                       val remaining = ((timerEndAt - System.currentTimeMillis() + 999L) / 1000L).toInt()
@@ -131,8 +125,8 @@ jobs:
                       prefs.edit().putLong(RestTimerService.KEY_END_AT, 0L).apply()
                   }
               }'''
-          if old not in s: raise SystemExit("Could not locate original timer loop")
-          s = s.replace(old, new)
+          s, count = re.subn(r'    LaunchedEffect\(timerActive\) \{.*?\n    \}', lambda _: new, s, count=1, flags=re.S)
+          if count != 1: raise SystemExit("Could not locate original timer loop")
           old = '                        if (updated[idx]) { seconds = 90; timerActive = true }'
           new = '''                        if (updated[idx]) {
                                   timerEndAt = System.currentTimeMillis() + 90_000L
