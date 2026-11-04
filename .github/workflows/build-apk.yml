@@ -243,7 +243,7 @@ jobs:
           s = s.replace(old_call, new_call)
 
           old_sig = '                          finish: (Boolean) -> Unit, seconds: Int, timerActive: Boolean, stopTimer: () -> Unit)'
-          new_sig = old_sig + ', prefs: android.content.SharedPreferences'
+          new_sig = old_sig[:-1] + ', prefs: android.content.SharedPreferences)'
           if s.count(old_sig) != 1:
               raise SystemExit("Could not locate WorkoutScreen signature")
           s = s.replace(old_sig, new_sig)
