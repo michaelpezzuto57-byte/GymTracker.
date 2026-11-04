@@ -363,8 +363,27 @@ jobs:
               }
           }
           """
+          import re
+          nav = r'@Composable\\s+private fun BottomNav\\(.*?(?=\\n@Composable|\\Z)'
+          nav_code = '''
+          @Composable
+          private fun BottomNav(tab: String, onTab: (String) -> Unit) {
+              Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(Panel2)
+                  .border(1.dp, RedDark, RoundedCornerShape(16.dp)).padding(5.dp),
+                  horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                  listOf("WORKOUT" to "ALLENAMENTO", "PESI" to "PESI", "STORICO" to "STORICO").forEach { (key, label) ->
+                      TextButton(onClick = { onTab(key) }, modifier = Modifier.weight(1f)) {
+                          Text(label, color = if (tab == key) Red else Muted, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                      }
+                  }
+              }
+          }
+          '''
+          if not re.search(nav, s, flags=re.S):
+              raise SystemExit("BottomNav function not found")
+          s = re.sub(nav, nav_code.strip(), s, count=1, flags=re.S)
           p.write_text(s)
-          print("PESI screen added")
+          print("PESI screen and bottom navigation added")
           PY
 
       - name: Build APK
