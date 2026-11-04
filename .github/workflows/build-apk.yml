@@ -141,7 +141,7 @@ jobs:
                                   try {
                                       val clockIntent = Intent(android.provider.AlarmClock.ACTION_SET_TIMER)
                                           .putExtra(android.provider.AlarmClock.EXTRA_LENGTH, 90)
-                                          .putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, "Recupero • " + ex.name)
+                                          .putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, "Recupero • Gym Tracker")
                                           .putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
                                       context.startActivity(clockIntent)
                                   } catch (_: Exception) {
