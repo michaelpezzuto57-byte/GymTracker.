@@ -82,6 +82,21 @@ jobs:
           print("Removed invalid weight modifiers from three outer Columns")
           PY
 
+      - name: Fix status bar overlap on Android
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          source = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          content = source.read_text()
+          old = 'Column(Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 14.dp))'
+          new = 'Column(Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp, vertical = 14.dp))'
+          if content.count(old) != 1:
+              raise SystemExit("Could not uniquely locate main screen Column")
+          source.write_text(content.replace(old, new))
+          print("Applied statusBarsPadding to keep app content below the Android status bar")
+          PY
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
