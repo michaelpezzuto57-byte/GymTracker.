@@ -164,6 +164,69 @@ jobs:
           print("Background 90-second timer, ongoing countdown notification, and notification permission added")
           PY
 
+      - name: Integrate the exact official app icon
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image
+          import os, re
+          root = Path(os.environ["PROJECT_DIR"])
+          icon = Path("gymtracker_icon.jpg")
+          if not icon.is_file():
+              raise SystemExit("gymtracker_icon.jpg is missing from the repository root")
+          app = root / "app/src/main"
+          with Image.open(icon) as im:
+              im = im.convert("RGBA")
+              # Preserve the supplied artwork; only resize it for Android launcher resources.
+              side = min(im.size)
+              left = (im.width - side) // 2
+              top = (im.height - side) // 2
+              artwork = im.crop((left, top, left + side, top + side))
+              for density, size in {"mdpi":48, "hdpi":72, "xhdpi":96, "xxhdpi":144, "xxxhdpi":192}.items():
+                  d = app / f"res/mipmap-{density}"
+                  d.mkdir(parents=True, exist_ok=True)
+                  artwork.resize((size, size), Image.Resampling.LANCZOS).save(d / "ic_launcher.png")
+                  artwork.resize((size, size), Image.Resampling.LANCZOS).save(d / "ic_launcher_round.png")
+              # Adaptive-icon foreground uses the same artwork with transparent safe-zone padding.
+              canvas = Image.new("RGBA", (432, 432), (0, 0, 0, 0))
+              fg = artwork.resize((288, 288), Image.Resampling.LANCZOS)
+              canvas.alpha_composite(fg, ((432-288)//2, (432-288)//2))
+              d = app / "res/drawable-nodpi"
+              d.mkdir(parents=True, exist_ok=True)
+              canvas.save(d / "ic_launcher_foreground.png")
+          colors = app / "res/values"
+          colors.mkdir(parents=True, exist_ok=True)
+          (colors / "ic_launcher_background.xml").write_text(
+              '<?xml version="1.0" encoding="utf-8"?>\n<resources><color name="ic_launcher_background">#000000</color></resources>\n'
+          )
+          adaptive = app / "res/mipmap-anydpi-v26"
+          adaptive.mkdir(parents=True, exist_ok=True)
+          xml = '''<?xml version="1.0" encoding="utf-8"?>
+          <adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+              <background android:drawable="@color/ic_launcher_background" />
+              <foreground android:drawable="@drawable/ic_launcher_foreground" />
+          </adaptive-icon>
+          '''
+          (adaptive / "ic_launcher.xml").write_text(xml)
+          (adaptive / "ic_launcher_round.xml").write_text(xml)
+          manifest = app / "AndroidManifest.xml"
+          text = manifest.read_text()
+          match = re.search(r"<application\b[^>]*>", text, re.S)
+          if not match:
+              raise SystemExit("Could not find application tag in AndroidManifest.xml")
+          tag = match.group(0)
+          for attr in ("icon", "roundIcon"):
+              pattern = rf'\s+android:{attr}="[^"]*"'
+              if re.search(pattern, tag):
+                  tag = re.sub(pattern, f' android:{attr}="@mipmap/ic_launcher"', tag)
+              else:
+                  tag = tag[:-1] + f' android:{attr}="@mipmap/ic_launcher">'
+          text = text[:match.start()] + tag + text[match.end():]
+          manifest.write_text(text)
+          print("Integrated gymtracker_icon.jpg as the launcher icon without redesigning the artwork")
+          PY
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
