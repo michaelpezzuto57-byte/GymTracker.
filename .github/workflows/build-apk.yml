@@ -136,21 +136,9 @@ jobs:
                                   prefs.edit().putLong(RestTimerService.KEY_END_AT, timerEndAt).apply()
                                   val serviceIntent = Intent(context, RestTimerService::class.java).putExtra(RestTimerService.EXTRA_END_AT, timerEndAt)
                                   ContextCompat.startForegroundService(context, serviceIntent)
-                                  // Start the default Clock timer so ColorOS can expose it in Aqua Dynamics.
-                                  // The existing foreground timer remains the fallback.
-                                  try {
-                                      val clockIntent = Intent(android.provider.AlarmClock.ACTION_SET_TIMER)
-                                          .putExtra(android.provider.AlarmClock.EXTRA_LENGTH, 90)
-                                          .putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, "Recupero • Gym Tracker")
-                                      val resolvedClock = clockIntent.resolveActivity(context.packageManager)
-                                      if (resolvedClock == null) {
-                                          android.widget.Toast.makeText(context, "Orologio non trovato: Android non ha trovato un'app compatibile", android.widget.Toast.LENGTH_LONG).show()
-                                      } else {
-                                          context.startActivity(clockIntent)
-                                      }
-                                  } catch (e: Exception) {
-                                      android.widget.Toast.makeText(context, "Errore apertura Orologio: ${e.javaClass.simpleName} - ${e.message ?: "nessun dettaglio"}", android.widget.Toast.LENGTH_LONG).show()
-                                  }
+                                  // Keep the user in Gym Tracker: the foreground service and in-app
+                                  // countdown run the 90-second rest timer without opening Clock.
+
                               }'''
           if old not in s: raise SystemExit("Could not locate set-complete timer callback")
           s = s.replace(old, new)
