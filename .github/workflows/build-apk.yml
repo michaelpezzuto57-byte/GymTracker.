@@ -364,7 +364,7 @@ jobs:
           }
           """
           import re
-          nav = r'@Composable\\s+private fun BottomNav\\(.*?(?=\\n@Composable|\\Z)'
+          nav = r'@Composable\s+private fun BottomNav\(.*?(?=\n@Composable|\Z)'
           nav_code = '''
           @Composable
           private fun BottomNav(tab: String, onTab: (String) -> Unit) {
