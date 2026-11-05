@@ -738,35 +738,44 @@ jobs:
         run: |
           python3 - <<'PY'
           from pathlib import Path
-          import os
+          import os, re
           p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/FirebaseAuthGate.kt"
           s = p.read_text()
+
           if "var passwordVisible by remember" not in s:
-              s = s.replace(
-                  '              var password by remember { mutableStateOf("") }',
-                  '              var password by remember { mutableStateOf("") }\n              var passwordVisible by remember { mutableStateOf(false) }',
-                  1
-              )
+              pattern = r'(var password by remember \{ mutableStateOf\(""\) \}\n)'
+              s, n = re.subn(pattern, r'\1              var passwordVisible by remember { mutableStateOf(false) }\n', s, count=1)
+              if n != 1:
+                  raise SystemExit("Non trovo la dichiarazione della password")
+
           if "import androidx.compose.ui.text.input.VisualTransformation" not in s:
-              s = s.replace(
-                  '          import androidx.compose.ui.text.input.PasswordVisualTransformation',
-                  '          import androidx.compose.ui.text.input.PasswordVisualTransformation\n          import androidx.compose.ui.text.input.VisualTransformation',
-                  1
-              )
-          old = '                              label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(),'
-          new = '''                              label = { Text("Password") },
-                              visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                              trailingIcon = {
-                                  TextButton(onClick = { passwordVisible = !passwordVisible }) {
-                                      Text(if (passwordVisible) "NASCONDI" else "MOSTRA", color = AuthRed, fontSize = 10.sp)
-                                  }
-                              },'''
-          if old in s:
-              s = s.replace(old, new, 1)
-          elif new not in s:
-              raise SystemExit("Campo Password non trovato nel formato atteso")
+              line = "import androidx.compose.ui.text.input.PasswordVisualTransformation"
+              if line not in s:
+                  raise SystemExit("Import PasswordVisualTransformation non trovato")
+              s = s.replace(line, line + "\n          import androidx.compose.ui.text.input.VisualTransformation", 1)
+
+          s = s.replace(
+              "visualTransformation = PasswordVisualTransformation()",
+              "visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation()",
+              1
+          )
+
+          if "Text(if (passwordVisible) \"NASCONDI\" else \"MOSTRA\"" not in s:
+              label = 'label = { Text("Password") },'
+              if label not in s:
+                  raise SystemExit("Etichetta del campo Password non trovata")
+              icon = '''label = { Text("Password") },
+                                  trailingIcon = {
+                                      TextButton(onClick = { passwordVisible = !passwordVisible }) {
+                                          Text(if (passwordVisible) "NASCONDI" else "MOSTRA", color = AuthRed, fontSize = 10.sp)
+                                      }
+                                  },'''
+              s = s.replace(label, icon, 1)
+
+          if "visualTransformation = if (passwordVisible)" not in s:
+              raise SystemExit("Non è stato possibile aggiornare la visualizzazione password")
           p.write_text(s)
-          print("Aggiunto comando MOSTRA/NASCONDI nel campo password")
+          print("Pulsante MOSTRA/NASCONDI password aggiunto")
           PY
 
       - name: Build APK
