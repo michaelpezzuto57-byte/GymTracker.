@@ -778,6 +778,87 @@ jobs:
           print("Pulsante MOSTRA/NASCONDI password aggiunto")
           PY
 
+      - name: Add lateral menu and profile
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          pkg = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app"
+          p = pkg / "MainActivity.kt"
+          s = p.read_text()
+          if "var drawerOpen by remember" not in s:
+              s = s.replace('    var tab by remember { mutableStateOf("HOME") }\n',
+                            '    var tab by remember { mutableStateOf("HOME") }\n    var drawerOpen by remember { mutableStateOf(false) }\n', 1)
+          old = '                Header()\n                Spacer(Modifier.height(18.dp))\n                when (tab) {'
+          new = '''                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { drawerOpen = !drawerOpen }) {
+                        Text("☰", color = Red, fontSize = 27.sp, fontWeight = FontWeight.Black)
+                    }
+                    Box(Modifier.weight(1f)) { Header() }
+                }
+                Spacer(Modifier.height(18.dp))
+                if (drawerOpen) {
+                    Column(Modifier.width(235.dp).clip(RoundedCornerShape(14.dp))
+                        .background(Panel).border(1.dp, RedDark, RoundedCornerShape(14.dp)).padding(12.dp)) {
+                        Text("MENU PRINCIPALE", color = Red, fontWeight = FontWeight.Black)
+                        listOf("ALLENAMENTO" to "HOME", "PESI" to "PESI", "STORICO" to "STORICO",
+                            "PROFILO" to "PROFILE").forEach { (label, destination) ->
+                            TextButton(onClick = { tab = destination; drawerOpen = false },
+                                modifier = Modifier.fillMaxWidth()) {
+                                Text(label, color = White, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        HorizontalDivider(color = RedDark)
+                        TextButton(onClick = {
+                            com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                            tab = "HOME"
+                            drawerOpen = false
+                        }, modifier = Modifier.fillMaxWidth()) {
+                            Text("ESCI DALL'ACCOUNT", color = Red, fontWeight = FontWeight.Black)
+                        }
+                    }
+                }
+                when (tab) {'''
+          if s.count(old) != 1:
+              raise SystemExit("Header/navigation anchor not found uniquely")
+          s = s.replace(old, new, 1)
+          route = '                    "PESI" -> WeightsScreen(day, prefs)'
+          profile = '''                    "PESI" -> WeightsScreen(day, prefs)
+                    "PROFILE" -> Column(Modifier.fillMaxWidth().background(Panel).padding(18.dp)) {
+                        Text("PROFILO", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                        Text("ACCOUNT COLLEGATO", color = Red, fontSize = 10.sp)
+                        Text(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: "Account Google",
+                            color = White, fontSize = 15.sp)
+                        TextButton(onClick = {
+                            com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                            tab = "HOME"
+                        }) { Text("ESCI DALL'ACCOUNT", color = Red, fontWeight = FontWeight.Black) }
+                    }'''
+          if s.count(route) != 1:
+              raise SystemExit("PESI route not found")
+          s = s.replace(route, profile, 1)
+          p.write_text(s)
+
+          auth = pkg / "FirebaseAuthGate.kt"
+          a = auth.read_text()
+          anchor = '    var user by remember { mutableStateOf(auth.currentUser) }\n'
+          listener = '''    var user by remember { mutableStateOf(auth.currentUser) }
+              DisposableEffect(auth) {
+                  val stateListener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { current ->
+                      user = current.currentUser
+                  }
+                  auth.addAuthStateListener(stateListener)
+                  onDispose { auth.removeAuthStateListener(stateListener) }
+              }
+'''
+          if "addAuthStateListener" not in a:
+              if a.count(anchor) != 1:
+                  raise SystemExit("Firebase user state anchor not found")
+              a = a.replace(anchor, listener, 1)
+          auth.write_text(a)
+          print("Lateral menu, profile and account sign-out added")
+          PY
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
