@@ -104,7 +104,19 @@ jobs:
         run: |
           set -euo pipefail
           KEYSTORE_PATH="$RUNNER_TEMP/gymtracker-release.jks"
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          python3 - <<'PY'
+          import os, re
+          value = os.environ.get("ANDROID_KEYSTORE_BASE64", "")
+          compact = re.sub(r"\\s+", "", value)
+          invalid = [(i, ord(ch)) for i, ch in enumerate(compact) if ch not in "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/="]
+          print(f"Keystore secret length: {len(compact)} characters")
+          print(f"Invalid Base64 character count: {len(invalid)}")
+          if invalid:
+              print("Invalid character positions and ASCII codes:", invalid[:20])
+          if len(compact) != 3712:
+              print("Expected 3712 characters for the existing 2784-byte keystore.")
+          PY
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\\r\\n ' | base64 --decode > "$KEYSTORE_PATH"
           test -s "$KEYSTORE_PATH"
           export ANDROID_KEYSTORE_PATH="$KEYSTORE_PATH"
           python3 - <<'PY'
