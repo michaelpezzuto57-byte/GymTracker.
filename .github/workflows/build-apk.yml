@@ -734,6 +734,41 @@ jobs:
           print("Added Firebase email/password + Google login gate and per-user Firestore backup sync")
           PY
 
+      - name: Add password visibility toggle
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/FirebaseAuthGate.kt"
+          s = p.read_text()
+          if "var passwordVisible by remember" not in s:
+              s = s.replace(
+                  '              var password by remember { mutableStateOf("") }',
+                  '              var password by remember { mutableStateOf("") }\n              var passwordVisible by remember { mutableStateOf(false) }',
+                  1
+              )
+          if "import androidx.compose.ui.text.input.VisualTransformation" not in s:
+              s = s.replace(
+                  '          import androidx.compose.ui.text.input.PasswordVisualTransformation',
+                  '          import androidx.compose.ui.text.input.PasswordVisualTransformation\n          import androidx.compose.ui.text.input.VisualTransformation',
+                  1
+              )
+          old = '                              label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(),'
+          new = '''                              label = { Text("Password") },
+                              visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                              trailingIcon = {
+                                  TextButton(onClick = { passwordVisible = !passwordVisible }) {
+                                      Text(if (passwordVisible) "NASCONDI" else "MOSTRA", color = AuthRed, fontSize = 10.sp)
+                                  }
+                              },'''
+          if old in s:
+              s = s.replace(old, new, 1)
+          elif new not in s:
+              raise SystemExit("Campo Password non trovato nel formato atteso")
+          p.write_text(s)
+          print("Aggiunto comando MOSTRA/NASCONDI nel campo password")
+          PY
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
