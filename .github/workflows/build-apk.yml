@@ -26,7 +26,7 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
-          gradle-version: '8.9'
+          gradle-version: '8.14.4'
 
       - name: Extract Racing Edition Android project
         run: unzip -o GymTracker_Racing_Edition_Source.zip -d project
@@ -107,14 +107,20 @@ jobs:
                   sourceCompatibility = JavaVersion.VERSION_17
                   targetCompatibility = JavaVersion.VERSION_17
               }
-              kotlinOptions {
-                  jvmTarget = "17"
-              }
           '''
           if "sourceCompatibility = JavaVersion.VERSION_17" not in content:
               content = content.replace("android {", "android {\n" + block, 1)
+          kotlin_block = '''
+          kotlin {
+              compilerOptions {
+                  jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
+              }
+          }
+          '''
+          if "compilerOptions" not in content:
+              content += "\n" + kotlin_block
           gradle_file.write_text(content)
-          print("Java and Kotlin targets set to 17 in", gradle_file)
+          print("Java 17 and Kotlin compilerOptions JVM_17 configured in", gradle_file)
           PY
 
       - name: Fix invalid outer layout weights
