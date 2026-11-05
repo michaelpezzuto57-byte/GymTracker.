@@ -95,6 +95,47 @@ jobs:
           fi
           echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
 
+      - name: Configure stable APK signing
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          set -euo pipefail
+          KEYSTORE_PATH="$RUNNER_TEMP/gymtracker-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
+          test -s "$KEYSTORE_PATH"
+          export ANDROID_KEYSTORE_PATH="$KEYSTORE_PATH"
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          gradle_file = Path(os.environ["PROJECT_DIR"]) / "app" / "build.gradle.kts"
+          content = gradle_file.read_text()
+          if 'create("stable")' in content:
+              raise SystemExit("La configurazione stable esiste già: controllo interrotto")
+          content += '''
+
+          android {
+              signingConfigs {
+                  create("stable") {
+                      storeFile = file(System.getenv("ANDROID_KEYSTORE_PATH"))
+                      storePassword = System.getenv("ANDROID_KEYSTORE_PASSWORD")
+                      keyAlias = System.getenv("ANDROID_KEY_ALIAS")
+                      keyPassword = System.getenv("ANDROID_KEY_PASSWORD")
+                  }
+              }
+              buildTypes {
+                  getByName("debug") {
+                      signingConfig = signingConfigs.getByName("stable")
+                  }
+              }
+          }
+          '''
+          gradle_file.write_text(content)
+          print("Firma stabile configurata per l\'APK debug.")
+          PY
+
       - name: Align Java and Kotlin JVM targets
         run: |
           python3 - <<'PY'
