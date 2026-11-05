@@ -74,7 +74,11 @@ jobs:
               implementation("com.google.firebase:firebase-firestore")'''
               ag = ag.replace(anchor, deps, 1)
           app_gradle.write_text(ag)
-          print("Firebase configurato: google-services.json copiato nel modulo app, plugin e SDK Auth/Firestore aggiunti.")
+          project_gradle = root / "build.gradle.kts"
+          pg = project_gradle.read_text()
+          pg = pg.replace('version "2.0.21"', 'version "2.4.0"')
+          project_gradle.write_text(pg)
+          print("Firebase configurato e Kotlin aggiornato a 2.4.0: google-services.json copiato nel modulo app, plugin e SDK Auth/Firestore aggiunti.")
           PY
 
       - name: Inspect original app structure
