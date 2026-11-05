@@ -386,6 +386,40 @@ jobs:
           print("PESI screen and bottom navigation added")
           PY
 
+      - name: Fix workout state loading and PESI layout scope
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text()
+          anchor = 'private data class Exercise(val name: String, val sets: Int, val reps: String)\n'
+          helper = '''
+
+          private fun loadChecks(prefs: android.content.SharedPreferences, day: String): List<Boolean> {
+              val total = routines[day]?.sumOf { it.sets } ?: 0
+              val saved = prefs.getString("checks_$day", null) ?: return List(total) { false }
+              return try {
+                  val json = JSONArray(saved)
+                  List(total) { index -> index < json.length() && json.optBoolean(index, false) }
+              } catch (_: Exception) {
+                  List(total) { false }
+              }
+          }
+          '''
+          if 'private fun loadChecks(' not in s:
+              if s.count(anchor) != 1:
+                  raise SystemExit("Could not locate Exercise data class to add loadChecks")
+              s = s.replace(anchor, anchor + helper, 1)
+          old = 'Column(Modifier.fillMaxWidth().weight(1f, fill = false)) {\n        Text("PESI"'
+          new = 'Column(Modifier.fillMaxWidth()) {\n        Text("PESI"'
+          if s.count(old) != 1:
+              raise SystemExit("Could not locate PESI outer Column weight modifier")
+          s = s.replace(old, new, 1)
+          p.write_text(s)
+          print("Added typed persisted checklist loader and removed invalid outer PESI weight modifier")
+          PY
+
       - name: Print generated Kotlin around compiler errors
         run: |
           FILE="$PROJECT_DIR/app/src/main/java/it/gymtracker/app/MainActivity.kt"
