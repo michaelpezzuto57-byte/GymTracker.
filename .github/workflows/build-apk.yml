@@ -31,6 +31,52 @@ jobs:
       - name: Extract Racing Edition Android project
         run: unzip -o GymTracker_Racing_Edition_Source.zip -d project
 
+      - name: Configure Firebase Android SDK
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import json, os
+          root = Path("project/GymTrackerNative")
+          app = root / "app"
+          config = Path("google-services.json")
+          if not config.is_file():
+              raise SystemExit("google-services.json non trovato nella root del repository")
+          data = json.loads(config.read_text())
+          clients = data.get("client", [])
+          if not any(c.get("client_info", {}).get("android_client_info", {}).get("package_name") == "it.gymtracker.app" for c in clients):
+              raise SystemExit("google-services.json non contiene il package it.gymtracker.app")
+          (app / "google-services.json").write_text(config.read_text())
+          
+          project_gradle = root / "build.gradle.kts"
+          pg = project_gradle.read_text()
+          plugin_line = '    id("com.google.gms.google-services") version "4.5.0" apply false'
+          if "com.google.gms.google-services" not in pg:
+              anchor = '    id("org.jetbrains.kotlin.plugin.compose") version "2.0.21" apply false'
+              if anchor not in pg:
+                  raise SystemExit("Plugin Kotlin Compose non trovato nel Gradle root")
+              pg = pg.replace(anchor, anchor + "\n" + plugin_line, 1)
+              project_gradle.write_text(pg)
+          
+          app_gradle = app / "build.gradle.kts"
+          ag = app_gradle.read_text()
+          if 'id("com.google.gms.google-services")' not in ag:
+              anchor = '    id("org.jetbrains.kotlin.plugin.compose")'
+              if anchor not in ag:
+                  raise SystemExit("Plugin Compose non trovato nel Gradle app")
+              ag = ag.replace(anchor, anchor + '\n    id("com.google.gms.google-services")', 1)
+          if 'com.google.firebase:firebase-bom' not in ag:
+              anchor = 'dependencies {'
+              if anchor not in ag:
+                  raise SystemExit("Blocco dependencies non trovato")
+              deps = '''dependencies {
+              implementation(platform("com.google.firebase:firebase-bom:35.1.0"))
+              implementation("com.google.firebase:firebase-auth")
+              implementation("com.google.firebase:firebase-firestore")'''
+              ag = ag.replace(anchor, deps, 1)
+          app_gradle.write_text(ag)
+          print("Firebase configurato: google-services.json copiato nel modulo app, plugin e SDK Auth/Firestore aggiunti.")
+          PY
+
       - name: Inspect original app structure
         run: |
           sed -n '1,280p' project/GymTrackerNative/app/src/main/java/it/gymtracker/app/MainActivity.kt
