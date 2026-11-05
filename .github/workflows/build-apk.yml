@@ -484,6 +484,256 @@ jobs:
           echo "===== LINES 370-415 ====="
           nl -ba "$FILE" | sed -n '370,415p'
 
+      - name: Implement Firebase login, Google sign-in and cloud backup
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ["PROJECT_DIR"])
+          app = root / "app"
+          pkg = app / "src/main/java/it/gymtracker/app"
+          main = pkg / "MainActivity.kt"
+          s = main.read_text()
+          old = 'setContent { RacingGymTracker(this) }'
+          if s.count(old) != 1:
+              raise SystemExit("MainActivity setContent entry point not found uniquely")
+          s = s.replace(old, 'setContent { FirebaseAuthGate(this) { RacingGymTracker(this) } }', 1)
+          main.write_text(s)
+
+          gradle = app / "build.gradle.kts"
+          g = gradle.read_text()
+          dep = '    implementation("com.google.android.gms:play-services-auth:21.4.0")'
+          if dep not in g:
+              g = g.replace('dependencies {', 'dependencies {\n' + dep, 1)
+          gradle.write_text(g)
+
+          manifest = app / "src/main/AndroidManifest.xml"
+          m = manifest.read_text()
+          if 'android.permission.INTERNET' not in m:
+              m = m.replace('<manifest xmlns:android="http://schemas.android.com/apk/res/android">', '<manifest xmlns:android="http://schemas.android.com/apk/res/android">\n    <uses-permission android:name="android.permission.INTERNET" />', 1)
+          manifest.write_text(m)
+
+          (pkg / "FirebaseAuthGate.kt").write_text(r'''package it.gymtracker.app
+
+          import android.app.Activity
+          import android.content.Intent
+          import androidx.activity.compose.rememberLauncherForActivityResult
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.foundation.text.KeyboardOptions
+          import androidx.compose.material3.*
+          import androidx.compose.runtime.*
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.text.input.KeyboardType
+          import androidx.compose.ui.text.input.PasswordVisualTransformation
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.google.android.gms.auth.api.signin.GoogleSignIn
+          import com.google.android.gms.auth.api.signin.GoogleSignInOptions
+          import com.google.firebase.auth.FirebaseAuth
+          import com.google.firebase.auth.GoogleAuthProvider
+
+          private val AuthBlack = Color(0xFF050505)
+          private val AuthPanel = Color(0xFF101010)
+          private val AuthRed = Color(0xFFFF1724)
+          private val AuthWhite = Color(0xFFF5F5F5)
+          private val AuthMuted = Color(0xFF9B9B9B)
+
+          @Composable
+          fun FirebaseAuthGate(activity: Activity, appContent: @Composable () -> Unit) {
+              val auth = remember { FirebaseAuth.getInstance() }
+              var user by remember { mutableStateOf(auth.currentUser) }
+              var email by remember { mutableStateOf("") }
+              var password by remember { mutableStateOf("") }
+              var createAccount by remember { mutableStateOf(false) }
+              var busy by remember { mutableStateOf(false) }
+              var error by remember { mutableStateOf("") }
+
+              val googleLauncher = rememberLauncherForActivityResult(
+                  ActivityResultContracts.StartActivityForResult()
+              ) { result ->
+                  if (result.resultCode == Activity.RESULT_OK) {
+                      val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                      try {
+                          val account = task.getResult(com.google.android.gms.common.api.ApiException::class.java)
+                          val credential = GoogleAuthProvider.getCredential(account.idToken, null)
+                          busy = true
+                          auth.signInWithCredential(credential).addOnCompleteListener { done ->
+                              busy = false
+                              if (done.isSuccessful) {
+                                  user = auth.currentUser
+                                  error = ""
+                              } else error = done.exception?.localizedMessage ?: "Accesso Google non riuscito"
+                          }
+                      } catch (e: Exception) {
+                          busy = false
+                          error = e.localizedMessage ?: "Accesso Google annullato o non riuscito"
+                      }
+                  } else {
+                      busy = false
+                  }
+              }
+
+              LaunchedEffect(user?.uid) {
+                  user?.uid?.let { CloudSync.start(activity.applicationContext, it) }
+              }
+
+              if (user != null) {
+                  appContent()
+              } else {
+                  Column(
+                      Modifier.fillMaxSize().background(AuthBlack).padding(24.dp),
+                      horizontalAlignment = Alignment.CenterHorizontally,
+                      verticalArrangement = Arrangement.Center
+                  ) {
+                      Text("GYM TRACKER", color = AuthWhite, fontSize = 29.sp, fontWeight = FontWeight.Black)
+                      Text("RACING EDITION  •  ACCOUNT", color = AuthRed, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                      Spacer(Modifier.height(28.dp))
+                      Column(
+                          Modifier.fillMaxWidth().background(AuthPanel, RoundedCornerShape(18.dp)).padding(20.dp),
+                          verticalArrangement = Arrangement.spacedBy(12.dp)
+                      ) {
+                          Text(if (createAccount) "CREA ACCOUNT" else "ACCEDI", color = AuthWhite, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                          OutlinedTextField(
+                              value = email, onValueChange = { email = it.trim() },
+                              modifier = Modifier.fillMaxWidth(), singleLine = true,
+                              label = { Text("Email") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Email),
+                              colors = OutlinedTextFieldDefaults.colors(
+                                  focusedBorderColor = AuthRed, unfocusedBorderColor = AuthMuted,
+                                  focusedTextColor = AuthWhite, unfocusedTextColor = AuthWhite,
+                                  focusedLabelColor = AuthRed, unfocusedLabelColor = AuthMuted
+                              )
+                          )
+                          OutlinedTextField(
+                              value = password, onValueChange = { password = it },
+                              modifier = Modifier.fillMaxWidth(), singleLine = true,
+                              label = { Text("Password") }, visualTransformation = PasswordVisualTransformation(),
+                              colors = OutlinedTextFieldDefaults.colors(
+                                  focusedBorderColor = AuthRed, unfocusedBorderColor = AuthMuted,
+                                  focusedTextColor = AuthWhite, unfocusedTextColor = AuthWhite,
+                                  focusedLabelColor = AuthRed, unfocusedLabelColor = AuthMuted
+                              )
+                          )
+                          Button(
+                              onClick = {
+                                  error = ""
+                                  if (email.isBlank() || password.length < 6) {
+                                      error = "Inserisci un'email valida e una password di almeno 6 caratteri."
+                                  } else {
+                                      busy = true
+                                      val task = if (createAccount) auth.createUserWithEmailAndPassword(email, password)
+                                                 else auth.signInWithEmailAndPassword(email, password)
+                                      task.addOnCompleteListener { done ->
+                                          busy = false
+                                          if (done.isSuccessful) user = auth.currentUser
+                                          else error = done.exception?.localizedMessage ?: "Operazione non riuscita"
+                                      }
+                                  }
+                              },
+                              modifier = Modifier.fillMaxWidth(),
+                              enabled = !busy,
+                              colors = ButtonDefaults.buttonColors(containerColor = AuthRed)
+                          ) {
+                              Text(if (createAccount) "REGISTRATI" else "ACCEDI", color = AuthWhite, fontWeight = FontWeight.Black)
+                          }
+                          TextButton(onClick = { createAccount = !createAccount; error = "" }, modifier = Modifier.fillMaxWidth()) {
+                              Text(if (createAccount) "Hai già un account? Accedi" else "Non hai un account? Registrati", color = AuthWhite)
+                          }
+                          HorizontalDivider(color = AuthMuted.copy(alpha = 0.35f))
+                          OutlinedButton(
+                              onClick = {
+                                  error = ""
+                                  val options = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
+                                      .requestIdToken(activity.getString(R.string.default_web_client_id))
+                                      .requestEmail()
+                                      .build()
+                                  val client = GoogleSignIn.getClient(activity, options)
+                                  busy = true
+                                  googleLauncher.launch(client.signInIntent)
+                              },
+                              modifier = Modifier.fillMaxWidth(), enabled = !busy
+                          ) {
+                              Text("CONTINUA CON GOOGLE", color = AuthWhite, fontWeight = FontWeight.Bold)
+                          }
+                          if (busy) CircularProgressIndicator(color = AuthRed, modifier = Modifier.align(Alignment.CenterHorizontally))
+                          if (error.isNotBlank()) Text(error, color = AuthRed, fontSize = 12.sp)
+                      }
+                      Spacer(Modifier.height(16.dp))
+                      Text("I tuoi allenamenti restano associati al tuo account.", color = AuthMuted, fontSize = 11.sp)
+                  }
+              }
+          }
+          ''')
+
+          (pkg / "CloudSync.kt").write_text(r'''package it.gymtracker.app
+
+          import android.content.Context
+          import android.content.SharedPreferences
+          import com.google.firebase.firestore.FieldValue
+          import com.google.firebase.firestore.FirebaseFirestore
+
+          object CloudSync {
+              private var activeUid: String? = null
+              private var listener: SharedPreferences.OnSharedPreferenceChangeListener? = null
+
+              @Synchronized
+              fun start(context: Context, uid: String) {
+                  if (activeUid == uid && listener != null) return
+                  val prefs = context.getSharedPreferences("gym_tracker", Context.MODE_PRIVATE)
+                  listener?.let { prefs.unregisterOnSharedPreferenceChangeListener(it) }
+                  activeUid = uid
+                  val document = FirebaseFirestore.getInstance()
+                      .collection("users").document(uid).collection("backup").document("workout")
+                  document.get().addOnSuccessListener { snapshot ->
+                      if (activeUid != uid) return@addOnSuccessListener
+                      if (snapshot.exists()) {
+                          val data = snapshot.data ?: emptyMap<String, Any>()
+                          val editor = prefs.edit()
+                          data.forEach { (key, value) ->
+                              if (key == "updatedAt") return@forEach
+                              when (value) {
+                                  is String -> editor.putString(key, value)
+                                  is Boolean -> editor.putBoolean(key, value)
+                                  is Int -> editor.putInt(key, value)
+                                  is Long -> editor.putLong(key, value)
+                                  is Double -> editor.putFloat(key, value.toFloat())
+                                  is Float -> editor.putFloat(key, value)
+                                  is List<*> -> editor.putStringSet(key, value.filterIsInstance<String>().toSet())
+                              }
+                          }
+                          editor.apply()
+                      } else {
+                          upload(prefs, document)
+                      }
+                      val changeListener = SharedPreferences.OnSharedPreferenceChangeListener { changed, _ ->
+                          if (activeUid == uid) upload(changed, document)
+                      }
+                      listener = changeListener
+                      prefs.registerOnSharedPreferenceChangeListener(changeListener)
+                  }
+              }
+
+              private fun upload(prefs: SharedPreferences, document: com.google.firebase.firestore.DocumentReference) {
+                  val data = mutableMapOf<String, Any>()
+                  prefs.all.forEach { (key, value) ->
+                      when (value) {
+                          is String, is Boolean, is Int, is Long, is Double, is Float -> data[key] = value
+                          is Set<*> -> data[key] = value.filterIsInstance<String>().toList()
+                      }
+                  }
+                  data["updatedAt"] = FieldValue.serverTimestamp()
+                  document.set(data)
+              }
+          }
+          ''')
+          print("Added Firebase email/password + Google login gate and per-user Firestore backup sync")
+          PY
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
