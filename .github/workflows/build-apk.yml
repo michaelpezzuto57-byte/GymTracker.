@@ -386,6 +386,14 @@ jobs:
           print("PESI screen and bottom navigation added")
           PY
 
+      - name: Print generated Kotlin around compiler errors
+        run: |
+          FILE="$PROJECT_DIR/app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          echo "===== LINES 45-145 ====="
+          nl -ba "$FILE" | sed -n '45,145p'
+          echo "===== LINES 370-415 ====="
+          nl -ba "$FILE" | sed -n '370,415p'
+
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
