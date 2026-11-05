@@ -778,86 +778,10 @@ jobs:
           print("Pulsante MOSTRA/NASCONDI password aggiunto")
           PY
 
-      - name: Add lateral menu and profile
+      - name: Add lateral menu, profile and sign out
         run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          pkg = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app"
-          p = pkg / "MainActivity.kt"
-          s = p.read_text()
-          if "var drawerOpen by remember" not in s:
-              s = s.replace('    var tab by remember { mutableStateOf("HOME") }\n',
-                            '    var tab by remember { mutableStateOf("HOME") }\n    var drawerOpen by remember { mutableStateOf(false) }\n', 1)
-          old = '                Header()\n                Spacer(Modifier.height(18.dp))\n                when (tab) {'
-          new = '''                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    TextButton(onClick = { drawerOpen = !drawerOpen }) {
-                        Text("☰", color = Red, fontSize = 27.sp, fontWeight = FontWeight.Black)
-                    }
-                    Box(Modifier.weight(1f)) { Header() }
-                }
-                Spacer(Modifier.height(18.dp))
-                if (drawerOpen) {
-                    Column(Modifier.width(235.dp).clip(RoundedCornerShape(14.dp))
-                        .background(Panel).border(1.dp, RedDark, RoundedCornerShape(14.dp)).padding(12.dp)) {
-                        Text("MENU PRINCIPALE", color = Red, fontWeight = FontWeight.Black)
-                        listOf("ALLENAMENTO" to "HOME", "PESI" to "PESI", "STORICO" to "STORICO",
-                            "PROFILO" to "PROFILE").forEach { (label, destination) ->
-                            TextButton(onClick = { tab = destination; drawerOpen = false },
-                                modifier = Modifier.fillMaxWidth()) {
-                                Text(label, color = White, fontWeight = FontWeight.Bold)
-                            }
-                        }
-                        HorizontalDivider(color = RedDark)
-                        TextButton(onClick = {
-                            com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
-                            tab = "HOME"
-                            drawerOpen = false
-                        }, modifier = Modifier.fillMaxWidth()) {
-                            Text("ESCI DALL'ACCOUNT", color = Red, fontWeight = FontWeight.Black)
-                        }
-                    }
-                }
-                when (tab) {'''
-          if s.count(old) != 1:
-              raise SystemExit("Header/navigation anchor not found uniquely")
-          s = s.replace(old, new, 1)
-          route = '                    "PESI" -> WeightsScreen(day, prefs)'
-          profile = '''                    "PESI" -> WeightsScreen(day, prefs)
-                    "PROFILE" -> Column(Modifier.fillMaxWidth().background(Panel).padding(18.dp)) {
-                        Text("PROFILO", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)
-                        Text("ACCOUNT COLLEGATO", color = Red, fontSize = 10.sp)
-                        Text(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: "Account Google",
-                            color = White, fontSize = 15.sp)
-                        TextButton(onClick = {
-                            com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
-                            tab = "HOME"
-                        }) { Text("ESCI DALL'ACCOUNT", color = Red, fontWeight = FontWeight.Black) }
-                    }'''
-          if s.count(route) != 1:
-              raise SystemExit("PESI route not found")
-          s = s.replace(route, profile, 1)
-          p.write_text(s)
-
-          auth = pkg / "FirebaseAuthGate.kt"
-          a = auth.read_text()
-          anchor = '    var user by remember { mutableStateOf(auth.currentUser) }\n'
-          listener = '''    var user by remember { mutableStateOf(auth.currentUser) }
-              DisposableEffect(auth) {
-                  val stateListener = com.google.firebase.auth.FirebaseAuth.AuthStateListener { current ->
-                      user = current.currentUser
-                  }
-                  auth.addAuthStateListener(stateListener)
-                  onDispose { auth.removeAuthStateListener(stateListener) }
-              }
-'''
-          if "addAuthStateListener" not in a:
-              if a.count(anchor) != 1:
-                  raise SystemExit("Firebase user state anchor not found")
-              a = a.replace(anchor, listener, 1)
-          auth.write_text(a)
-          print("Lateral menu, profile and account sign-out added")
-          PY
+          echo 'ZnJvbSBwYXRobGliIGltcG9ydCBQYXRoCmltcG9ydCBvcwpwa2cgPSBQYXRoKG9zLmVudmlyb25bIlBST0pFQ1RfRElSIl0pIC8gImFwcC9zcmMvbWFpbi9qYXZhL2l0L2d5bXRyYWNrZXIvYXBwIgpwID0gcGtnIC8gIk1haW5BY3Rpdml0eS5rdCIKcyA9IHAucmVhZF90ZXh0KCkKaWYgInZhciBkcmF3ZXJPcGVuIGJ5IHJlbWVtYmVyIiBub3QgaW4gczoKICAgIGFuY2hvciA9ICcgICAgdmFyIHRhYiBieSByZW1lbWJlciB7IG11dGFibGVTdGF0ZU9mKCJIT01FIikgfVxuJwogICAgaWYgcy5jb3VudChhbmNob3IpICE9IDE6IHJhaXNlIFN5c3RlbUV4aXQoIk5hdmlnYXRpb24gc3RhdGUgbm90IGZvdW5kIikKICAgIHMgPSBzLnJlcGxhY2UoYW5jaG9yLCBhbmNob3IgKyAnICAgIHZhciBkcmF3ZXJPcGVuIGJ5IHJlbWVtYmVyIHsgbXV0YWJsZVN0YXRlT2YoZmFsc2UpIH1cbicsIDEpCm9sZCA9ICcgICAgICAgICAgICAgICAgSGVhZGVyKClcbiAgICAgICAgICAgICAgICBTcGFjZXIoTW9kaWZpZXIuaGVpZ2h0KDE4LmRwKSlcbiAgICAgICAgICAgICAgICB3aGVuICh0YWIpIHsnCm5ldyA9ICIiIiAgICAgICAgICAgICAgICBSb3coTW9kaWZpZXIuZmlsbE1heFdpZHRoKCksIHZlcnRpY2FsQWxpZ25tZW50ID0gQWxpZ25tZW50LkNlbnRlclZlcnRpY2FsbHkpIHsKICAgICAgICAgICAgICAgICAgICBUZXh0QnV0dG9uKG9uQ2xpY2sgPSB7IGRyYXdlck9wZW4gPSAhZHJhd2VyT3BlbiB9KSB7CiAgICAgICAgICAgICAgICAgICAgICAgIFRleHQoIk1FTlUiLCBjb2xvciA9IFJlZCwgZm9udFNpemUgPSAxNi5zcCwgZm9udFdlaWdodCA9IEZvbnRXZWlnaHQuQmxhY2spCiAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgIEJveChNb2RpZmllci53ZWlnaHQoMWYpKSB7IEhlYWRlcigpIH0KICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgIFNwYWNlcihNb2RpZmllci5oZWlnaHQoMTguZHApKQogICAgICAgICAgICAgICAgaWYgKGRyYXdlck9wZW4pIHsKICAgICAgICAgICAgICAgICAgICBDb2x1bW4oTW9kaWZpZXIud2lkdGgoMjM1LmRwKS5jbGlwKFJvdW5kZWRDb3JuZXJTaGFwZSgxNC5kcCkpCiAgICAgICAgICAgICAgICAgICAgICAgIC5iYWNrZ3JvdW5kKFBhbmVsKS5ib3JkZXIoMS5kcCwgUmVkRGFyaywgUm91bmRlZENvcm5lclNoYXBlKDE0LmRwKSkucGFkZGluZygxMi5kcCkpIHsKICAgICAgICAgICAgICAgICAgICAgICAgVGV4dCgiTUVOVSBQUklOQ0lQQUxFIiwgY29sb3IgPSBSZWQsIGZvbnRXZWlnaHQgPSBGb250V2VpZ2h0LkJsYWNrKQogICAgICAgICAgICAgICAgICAgICAgICBsaXN0T2YoIkFMTEVOQU1FTlRPIiB0byAiSE9NRSIsICJQRVNJIiB0byAiUEVTSSIsICJTVE9SSUNPIiB0byAiU1RPUklDTyIsCiAgICAgICAgICAgICAgICAgICAgICAgICAgICAiUFJPRklMTyIgdG8gIlBST0ZJTEUiKS5mb3JFYWNoIHsgKGxhYmVsLCBkZXN0aW5hdGlvbikgLT4KICAgICAgICAgICAgICAgICAgICAgICAgICAgIFRleHRCdXR0b24ob25DbGljayA9IHsgdGFiID0gZGVzdGluYXRpb247IGRyYXdlck9wZW4gPSBmYWxzZSB9LAogICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgIG1vZGlmaWVyID0gTW9kaWZpZXIuZmlsbE1heFdpZHRoKCkpIHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICBUZXh0KGxhYmVsLCBjb2xvciA9IFdoaXRlLCBmb250V2VpZ2h0ID0gRm9udFdlaWdodC5Cb2xkKQogICAgICAgICAgICAgICAgICAgICAgICAgICAgfQogICAgICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgICAgICAgIEhvcml6b250YWxEaXZpZGVyKGNvbG9yID0gUmVkRGFyaykKICAgICAgICAgICAgICAgICAgICAgICAgVGV4dEJ1dHRvbihvbkNsaWNrID0gewogICAgICAgICAgICAgICAgICAgICAgICAgICAgY29tLmdvb2dsZS5maXJlYmFzZS5hdXRoLkZpcmViYXNlQXV0aC5nZXRJbnN0YW5jZSgpLnNpZ25PdXQoKQogICAgICAgICAgICAgICAgICAgICAgICAgICAgdGFiID0gIkhPTUUiCiAgICAgICAgICAgICAgICAgICAgICAgICAgICBkcmF3ZXJPcGVuID0gZmFsc2UKICAgICAgICAgICAgICAgICAgICAgICAgfSwgbW9kaWZpZXIgPSBNb2RpZmllci5maWxsTWF4V2lkdGgoKSkgewogICAgICAgICAgICAgICAgICAgICAgICAgICAgVGV4dCgiRVNDSSBEQUxMJ0FDQ09VTlQiLCBjb2xvciA9IFJlZCwgZm9udFdlaWdodCA9IEZvbnRXZWlnaHQuQmxhY2spCiAgICAgICAgICAgICAgICAgICAgICAgIH0KICAgICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICB3aGVuICh0YWIpIHsiIiIKaWYgcy5jb3VudChvbGQpICE9IDE6IHJhaXNlIFN5c3RlbUV4aXQoIkhlYWRlci9uYXZpZ2F0aW9uIGFuY2hvciBub3QgZm91bmQgdW5pcXVlbHkiKQpzID0gcy5yZXBsYWNlKG9sZCwgbmV3LCAxKQpyb3V0ZSA9ICcgICAgICAgICAgICAgICAgICAgICJQRVNJIiAtPiBXZWlnaHRzU2NyZWVuKGRheSwgcHJlZnMpJwpwcm9maWxlID0gIiIiICAgICAgICAgICAgICAgICAgICAiUEVTSSIgLT4gV2VpZ2h0c1NjcmVlbihkYXksIHByZWZzKQogICAgICAgICAgICAgICAgICAgICJQUk9GSUxFIiAtPiBDb2x1bW4oTW9kaWZpZXIuZmlsbE1heFdpZHRoKCkuYmFja2dyb3VuZChQYW5lbCkucGFkZGluZygxOC5kcCkpIHsKICAgICAgICAgICAgICAgICAgICAgICAgVGV4dCgiUFJPRklMTyIsIGNvbG9yID0gV2hpdGUsIGZvbnRTaXplID0gMjIuc3AsIGZvbnRXZWlnaHQgPSBGb250V2VpZ2h0LkJsYWNrKQogICAgICAgICAgICAgICAgICAgICAgICBUZXh0KCJBQ0NPVU5UIENPTExFR0FUTyIsIGNvbG9yID0gUmVkLCBmb250U2l6ZSA9IDEwLnNwKQogICAgICAgICAgICAgICAgICAgICAgICBUZXh0KGNvbS5nb29nbGUuZmlyZWJhc2UuYXV0aC5GaXJlYmFzZUF1dGguZ2V0SW5zdGFuY2UoKS5jdXJyZW50VXNlcj8uZW1haWwgPzogIkFjY291bnQgR29vZ2xlIiwKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbG9yID0gV2hpdGUsIGZvbnRTaXplID0gMTUuc3ApCiAgICAgICAgICAgICAgICAgICAgICAgIFRleHRCdXR0b24ob25DbGljayA9IHsKICAgICAgICAgICAgICAgICAgICAgICAgICAgIGNvbS5nb29nbGUuZmlyZWJhc2UuYXV0aC5GaXJlYmFzZUF1dGguZ2V0SW5zdGFuY2UoKS5zaWduT3V0KCkKICAgICAgICAgICAgICAgICAgICAgICAgICAgIHRhYiA9ICJIT01FIgogICAgICAgICAgICAgICAgICAgICAgICB9KSB7IFRleHQoIkVTQ0kgREFMTCdBQ0NPVU5UIiwgY29sb3IgPSBSZWQsIGZvbnRXZWlnaHQgPSBGb250V2VpZ2h0LkJsYWNrKSB9CiAgICAgICAgICAgICAgICAgICAgfSIiIgppZiBzLmNvdW50KHJvdXRlKSAhPSAxOiByYWlzZSBTeXN0ZW1FeGl0KCJQRVNJIHJvdXRlIG5vdCBmb3VuZCIpCnMgPSBzLnJlcGxhY2Uocm91dGUsIHByb2ZpbGUsIDEpCnAud3JpdGVfdGV4dChzKQphdXRoID0gcGtnIC8gIkZpcmViYXNlQXV0aEdhdGUua3QiCmEgPSBhdXRoLnJlYWRfdGV4dCgpCmFuY2hvciA9ICcgICAgdmFyIHVzZXIgYnkgcmVtZW1iZXIgeyBtdXRhYmxlU3RhdGVPZihhdXRoLmN1cnJlbnRVc2VyKSB9XG4nCmxpc3RlbmVyID0gIiIiICAgIHZhciB1c2VyIGJ5IHJlbWVtYmVyIHsgbXV0YWJsZVN0YXRlT2YoYXV0aC5jdXJyZW50VXNlcikgfQogICAgICAgICAgICAgIERpc3Bvc2FibGVFZmZlY3QoYXV0aCkgewogICAgICAgICAgICAgICAgICB2YWwgc3RhdGVMaXN0ZW5lciA9IGNvbS5nb29nbGUuZmlyZWJhc2UuYXV0aC5GaXJlYmFzZUF1dGguQXV0aFN0YXRlTGlzdGVuZXIgeyBjdXJyZW50IC0+CiAgICAgICAgICAgICAgICAgICAgICB1c2VyID0gY3VycmVudC5jdXJyZW50VXNlcgogICAgICAgICAgICAgICAgICB9CiAgICAgICAgICAgICAgICAgIGF1dGguYWRkQXV0aFN0YXRlTGlzdGVuZXIoc3RhdGVMaXN0ZW5lcikKICAgICAgICAgICAgICAgICAgb25EaXNwb3NlIHsgYXV0aC5yZW1vdmVBdXRoU3RhdGVMaXN0ZW5lcihzdGF0ZUxpc3RlbmVyKSB9CiAgICAgICAgICAgICAgfQoiIiIKaWYgImFkZEF1dGhTdGF0ZUxpc3RlbmVyIiBub3QgaW4gYToKICAgIGlmIGEuY291bnQoYW5jaG9yKSAhPSAxOiByYWlzZSBTeXN0ZW1FeGl0KCJGaXJlYmFzZSB1c2VyIHN0YXRlIGFuY2hvciBub3QgZm91bmQiKQogICAgYSA9IGEucmVwbGFjZShhbmNob3IsIGxpc3RlbmVyLCAxKQphdXRoLndyaXRlX3RleHQoYSkKcHJpbnQoIkxhdGVyYWwgbWVudSwgcHJvZmlsZSBhbmQgc2lnbiBvdXQgYWRkZWQiKQo=' | base64 -d > /tmp/add_menu.py
+          python3 /tmp/add_menu.py
 
       - name: Build APK
         run: gradle -p "$PROJECT_DIR" assembleDebug
