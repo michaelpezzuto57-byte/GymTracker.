@@ -1044,6 +1044,33 @@ jobs:
           print("Statistiche, calendario e record personali inseriti")
           PY
 
+      - name: Remove unused bottom spacer and lock header
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+          # The header stays outside the scroll container. The selected screen
+          # occupies the remaining height and scrolls; the bottom navigation
+          # stays anchored without a second weighted spacer creating a black void.
+          old = """                }
+                Spacer(Modifier.weight(1f))
+                BottomNav(tab) { tab = it }"""
+          new = """                }
+                BottomNav(tab) { tab = it }"""
+          if s.count(old) != 1:
+              raise SystemExit("Main layout bottom spacer anchor not found uniquely; stopping safely")
+          s = s.replace(old, new, 1)
+          scroll_anchor = "Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()))"
+          if s.count(scroll_anchor) != 1:
+              raise SystemExit("Scrollable content container not found uniquely")
+          if "Header { drawerOpen = true }" not in s:
+              raise SystemExit("Fixed header/menu call not found")
+          p.write_text(s, encoding="utf-8")
+          print("Removed the redundant black bottom gap; header remains fixed and screen content scrolls.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
