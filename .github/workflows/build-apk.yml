@@ -1651,6 +1651,142 @@ jobs:
           print(f"Swipe orizzontale disattivato nei pager ({pager_count} trovati); recupero impostato a 60 secondi.")
           PY
 
+      - name: Draw visible exercise-specific guide illustrations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+
+          def block_bounds(src, marker):
+              start = src.find(marker)
+              if start < 0:
+                  raise SystemExit("Blocco non trovato: " + marker)
+              brace = src.find("{", start)
+              depth = 0
+              for i in range(brace, len(src)):
+                  if src[i] == "{": depth += 1
+                  elif src[i] == "}":
+                      depth -= 1
+                      if depth == 0: return start, i + 1
+              raise SystemExit("Blocco non chiuso: " + marker)
+
+          # Replace the old generic stick figure with a clearer, exercise-aware
+          # vector illustration for the library cards.
+          a, b = block_bounds(s, "@Composable\nprivate fun ExerciseThumbnail(")
+          thumb = r"""@Composable
+          private fun ExerciseThumbnail(name: String, modifier: Modifier = Modifier) {
+              ExerciseMovementDiagram(name, 0, modifier)
+          }"""
+          s = s[:a] + thumb + s[b:]
+
+          # The detail screen now uses two different positions of the same
+          # exercise-specific illustration, rather than the same generic figure.
+          detail_start = s.find("private fun ExerciseGuideScreen(")
+          canvas_marker = "androidx.compose.foundation.Canvas(Modifier.fillMaxSize().padding(8.dp)) {"
+          a, b = block_bounds(s[detail_start:], canvas_marker)
+          a += detail_start
+          b += detail_start
+          s = s[:a] + "ExerciseMovementDiagram(current.name, i, Modifier.fillMaxSize().padding(8.dp))" + s[b:]
+
+          diagram = r"""
+          @Composable
+          private fun ExerciseMovementDiagram(name: String, phase: Int, modifier: Modifier = Modifier) {
+              androidx.compose.foundation.Canvas(modifier) {
+                  val n = name.lowercase()
+                  val red = Color(0xFFE21B2D)
+                  val pale = Color(0xFFEAEAEA)
+                  val dim = Color(0xFF666666)
+                  val w = size.width
+                  val h = size.height
+                  val cx = w * 0.5f
+                  val floor = h * 0.88f
+                  val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = (w * 0.025f).coerceAtLeast(2f), cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                  fun pt(x: Float, y: Float) = androidx.compose.ui.geometry.Offset(w * x, h * y)
+                  fun line(x1: Float, y1: Float, x2: Float, y2: Float, color: Color = pale, width: Float = 4f) {
+                      drawLine(color, pt(x1,y1), pt(x2,y2), width, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                  }
+                  fun joint(x: Float, y: Float, r: Float = 0.035f) { drawCircle(pale, w*r, pt(x,y)) }
+                  fun bar(y: Float, half: Float = 0.34f) {
+                      line(cx/w-half,y,cx/w+half,y,red,5f)
+                      drawRect(red, topLeft=pt(cx/w-half-0.035f,y-0.055f), size=androidx.compose.ui.geometry.Size(w*0.035f,h*0.11f))
+                      drawRect(red, topLeft=pt(cx/w+half,y-0.055f), size=androidx.compose.ui.geometry.Size(w*0.035f,h*0.11f))
+                  }
+                  line(0.08f,0.90f,0.92f,0.90f,dim,2f)
+                  val isLeg = listOf("squat","pressa","affondi","leg","stacco","polpacci").any { n.contains(it) }
+                  val isChest = listOf("panca","chest","croci","push").any { n.contains(it) }
+                  val isCurl = listOf("curl","bicip","tricip","french","pushdown").any { n.contains(it) }
+                  val isBack = listOf("lat","pulley","rematore","traz","rowing","dorso").any { n.contains(it) }
+                  val isShoulder = listOf("military","alzate","shoulder","spalle").any { n.contains(it) }
+                  when {
+                      isChest -> {
+                          // Bench press: bench, lying athlete, bar path.
+                          line(0.15f,0.69f,0.84f,0.69f,dim,7f); line(0.25f,0.69f,0.25f,0.86f,dim,5f); line(0.74f,0.69f,0.74f,0.86f,dim,5f)
+                          line(0.30f,0.61f,0.67f,0.61f); joint(0.25f,0.61f,0.045f)
+                          line(0.67f,0.61f,0.78f,0.75f); line(0.67f,0.61f,0.80f,0.55f)
+                          line(0.78f,0.75f,0.87f,0.75f); line(0.80f,0.55f,0.88f,0.55f)
+                          bar(if (phase == 0) 0.39f else 0.48f,0.35f)
+                      }
+                      isLeg -> {
+                          // Squat / leg work: torso, bent or extended knees and bar.
+                          joint(0.50f,0.18f,0.055f); line(0.50f,0.25f,0.50f,0.52f)
+                          line(0.50f,0.32f,0.29f,0.37f); line(0.50f,0.32f,0.71f,0.37f)
+                          val knee = if (phase == 0) 0.66f else 0.57f
+                          line(0.50f,0.52f,0.36f,knee); line(0.36f,knee,0.25f,0.82f)
+                          line(0.50f,0.52f,0.64f,knee); line(0.64f,knee,0.75f,0.82f)
+                          bar(0.27f,0.30f)
+                      }
+                      isCurl -> {
+                          // Curl: upright torso, upper arm and forearm at two angles.
+                          joint(0.50f,0.17f,0.055f); line(0.50f,0.24f,0.50f,0.58f)
+                          line(0.50f,0.31f,0.31f,0.45f); line(0.50f,0.31f,0.68f,0.45f)
+                          val elbowY = if (phase == 0) 0.46f else 0.39f
+                          line(0.31f,0.45f,0.25f,0.66f); line(0.25f,0.66f,if (phase == 0) 0.20f else 0.35f,if (phase == 0) 0.79f else 0.35f,red,5f)
+                          line(0.68f,0.45f,0.75f,0.66f); line(0.75f,0.66f,if (phase == 0) 0.80f else 0.65f,if (phase == 0) 0.79f else 0.35f,red,5f)
+                          line(0.50f,0.58f,0.39f,0.82f); line(0.50f,0.58f,0.61f,0.82f)
+                          joint(0.25f,0.66f); joint(0.75f,0.66f)
+                      }
+                      isBack -> {
+                          // Lat pulldown / row: cable tower and pulling position.
+                          line(0.16f,0.10f,0.16f,0.86f,dim,6f); line(0.16f,0.10f,0.84f,0.10f,dim,6f); line(0.84f,0.10f,0.84f,0.86f,dim,6f)
+                          joint(0.50f,0.35f,0.05f); line(0.50f,0.42f,0.50f,0.67f)
+                          line(0.50f,0.46f,0.31f,if (phase == 0) 0.20f else 0.42f); line(0.50f,0.46f,0.69f,if (phase == 0) 0.20f else 0.42f)
+                          line(0.31f,if (phase == 0) 0.20f else 0.42f,0.50f,0.15f,red,4f); line(0.69f,if (phase == 0) 0.20f else 0.42f,0.50f,0.15f,red,4f)
+                          line(0.50f,0.67f,0.39f,0.84f); line(0.50f,0.67f,0.61f,0.84f)
+                          line(0.34f,0.15f,0.66f,0.15f,red,5f)
+                      }
+                      isShoulder -> {
+                          // Shoulder press / lateral raise: arm positions differ.
+                          joint(0.50f,0.17f,0.055f); line(0.50f,0.24f,0.50f,0.60f)
+                          val armY = if (phase == 0) 0.42f else 0.17f
+                          line(0.50f,0.32f,0.30f,armY); line(0.50f,0.32f,0.70f,armY)
+                          line(0.30f,armY,0.24f,if (phase == 0) 0.57f else 0.20f,red,5f)
+                          line(0.70f,armY,0.76f,if (phase == 0) 0.57f else 0.20f,red,5f)
+                          line(0.50f,0.60f,0.39f,0.84f); line(0.50f,0.60f,0.61f,0.84f)
+                          joint(0.24f,if (phase == 0) 0.57f else 0.20f); joint(0.76f,if (phase == 0) 0.57f else 0.20f)
+                      }
+                      else -> {
+                          // General exercise silhouette with clearly visible red equipment.
+                          joint(0.50f,0.18f,0.055f); line(0.50f,0.25f,0.50f,0.58f)
+                          line(0.50f,0.34f,0.27f,0.48f); line(0.50f,0.34f,0.73f,0.48f)
+                          line(0.50f,0.58f,0.37f,0.84f); line(0.50f,0.58f,0.63f,0.84f)
+                          bar(if (phase == 0) 0.42f else 0.34f,0.32f)
+                      }
+                  }
+              }
+          }
+
+          """
+          if "private fun ExerciseMovementDiagram(" not in s:
+              anchor = "@Composable\nprivate fun ExerciseGuideScreen("
+              if s.count(anchor) != 1:
+                  raise SystemExit("Punto di inserimento della guida non univoco")
+              s = s.replace(anchor, diagram + anchor, 1)
+          p.write_text(s, encoding="utf-8")
+          print("Miniature e tavole di dettaglio sostituite con illustrazioni vettoriali specifiche per gruppo di esercizi.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
