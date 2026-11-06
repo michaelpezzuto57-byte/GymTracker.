@@ -375,93 +375,61 @@ jobs:
           s = s.replace(old_sig, new_sig)
 
           old_state = '    val startIndex = exercises.take(selected).sumOf { it.sets }\n'
-          new_state = old_state + '    var weightDialogSet by remember(day, selected) { mutableIntStateOf(-1) }\n'
+          new_state = old_state + '    var weightDialogSet by remember(day, selected) { mutableIntStateOf(-1) }\n    var weightInput by remember(day, selected) { mutableStateOf("") }\n'
           if s.count(old_state) != 1:
               raise SystemExit("Could not locate exercise set index")
           s = s.replace(old_state, new_state)
 
           old_row = '                    Text("${ex.reps} rip.", color = Muted, fontSize = 12.sp)\n                    Spacer(Modifier.width(8.dp))\n                    Text(if (checked) "✓" else "○", color = Red, fontSize = 22.sp, fontWeight = FontWeight.Black)'
-          new_row = '                    Text("${ex.reps} rip.", color = Muted, fontSize = 12.sp)\n                    Spacer(Modifier.width(5.dp))\n                    val savedWeight = prefs.getInt("weight_${day}_${selected}_${s}", 0)\n                    TextButton(onClick = { weightDialogSet = s }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp)) {\n                        Text(if (savedWeight > 0) "${savedWeight} kg" else "KG +", color = Red, fontWeight = FontWeight.Black, fontSize = 12.sp)\n                    }\n                    Spacer(Modifier.width(3.dp))\n                    Text(if (checked) "✓" else "○", color = Red, fontSize = 22.sp, fontWeight = FontWeight.Black)'
+          new_row = '                    Text("${ex.reps} rip.", color = Muted, fontSize = 12.sp)\n                    Spacer(Modifier.width(5.dp))\n                    val weightKey = "weight_${day}_${selected}_${s}"\n                    val savedWeight = prefs.all[weightKey]?.toString() ?: ""\n                    TextButton(onClick = { weightDialogSet = s; weightInput = savedWeight }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp)) {\n                        Text(if (savedWeight.isNotBlank()) "${savedWeight} kg" else "KG +", color = Red, fontWeight = FontWeight.Black, fontSize = 12.sp)\n                    }\n                    Spacer(Modifier.width(3.dp))\n                    Text(if (checked) "✓" else "○", color = Red, fontSize = 22.sp, fontWeight = FontWeight.Black)'
           if s.count(old_row) != 1:
               raise SystemExit("Could not locate set row")
           s = s.replace(old_row, new_row)
 
           old_after = '            }\n        }\n        if (timerActive && seconds > 0) {'
-          new_after = '            }\n        }\n        if (weightDialogSet >= 0) {\n            val chosenSet = weightDialogSet\n            AlertDialog(\n                onDismissRequest = { weightDialogSet = -1 },\n                title = { Text("PESO • SERIE ${chosenSet + 1}", color = White, fontWeight = FontWeight.Black) },\n                text = {\n                    LazyColumn(Modifier.heightIn(max = 340.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {\n                        items(count = 40) { kgIndex ->\n                            val kg = (kgIndex + 1) * 5\n                            TextButton(onClick = {\n                                prefs.edit().putInt("weight_${day}_${selected}_${chosenSet}", kg).apply()\n                                weightDialogSet = -1\n                            }, modifier = Modifier.fillMaxWidth()) {\n                                Text("${kg} KG", color = Red, fontSize = 17.sp, fontWeight = FontWeight.Bold)\n                            }\n                        }\n                    }\n                },\n                confirmButton = {},\n                containerColor = Panel,\n                titleContentColor = White,\n                textContentColor = White\n            )\n        }\n        if (timerActive && seconds > 0) {'
+          new_after = '''            }
+        }
+        if (weightDialogSet >= 0) {
+            val chosenSet = weightDialogSet
+            AlertDialog(
+                onDismissRequest = { weightDialogSet = -1 },
+                title = { Text("PESO • SERIE ${chosenSet + 1}", color = White, fontWeight = FontWeight.Black) },
+                text = {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("INSERISCI IL CARICO USATO", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                        androidx.compose.foundation.text.BasicTextField(
+                            value = weightInput,
+                            onValueChange = { value -> weightInput = value.filter { it.isDigit() || it == '.' || it == ',' } },
+                            singleLine = true,
+                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
+                            textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold),
+                            modifier = Modifier.fillMaxWidth().background(Panel2, RoundedCornerShape(10.dp)).padding(14.dp)
+                        )
+                        Text("KG • Puoi inserire anche valori decimali", color = Red, fontSize = 10.sp)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val normalized = weightInput.trim().replace(',', '.')
+                        val key = "weight_${day}_${selected}_${chosenSet}"
+                        if (normalized.isBlank()) prefs.edit().remove(key).apply()
+                        else prefs.edit().putString(key, normalized).apply()
+                        weightDialogSet = -1
+                    }) { Text("SALVA", color = Red, fontWeight = FontWeight.Black) }
+                },
+                dismissButton = { TextButton(onClick = { weightDialogSet = -1 }) { Text("ANNULLA", color = Muted) } },
+                containerColor = Panel,
+                titleContentColor = White,
+                textContentColor = White
+            )
+        }
+        if (timerActive && seconds > 0) {'''
           if s.count(old_after) != 1:
               raise SystemExit("Could not locate timer block")
           s = s.replace(old_after, new_after)
 
           source.write_text(s)
-          print("Added a saved 5 kg selector for each set (5–200 kg)")
-          PY
-
-      - name: Allow direct decimal weight entry during workouts
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
-          s = p.read_text(encoding="utf-8")
-
-          state = '    var weightDialogSet by remember(day, selected) { mutableIntStateOf(-1) }\n'
-          if s.count(state) != 1:
-              raise SystemExit("Stato del selettore peso non trovato in modo univoco")
-          s = s.replace(state, state + '    var weightInput by remember(day, selected) { mutableStateOf("") }\n', 1)
-
-          old_click = 'TextButton(onClick = { weightDialogSet = s }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp))'
-          new_click = 'TextButton(onClick = { weightDialogSet = s; weightInput = prefs.all["weight_${day}_${selected}_${s}"]?.toString() ?: "" }, contentPadding = PaddingValues(horizontal = 7.dp, vertical = 2.dp))'
-          if s.count(old_click) != 1:
-              raise SystemExit("Pulsante KG della singola serie non trovato")
-          s = s.replace(old_click, new_click, 1)
-
-          old_display = 'val savedWeight = prefs.getInt("weight_${day}_${selected}_${s}", 0)'
-          new_display = 'val savedWeight = prefs.all["weight_${day}_${selected}_${s}"]?.toString()?.toDoubleOrNull()?.toInt() ?: 0'
-          if s.count(old_display) != 1:
-              raise SystemExit("Visualizzazione del peso salvato non trovata")
-          s = s.replace(old_display, new_display, 1)
-
-          start = s.find('        if (weightDialogSet >= 0) {')
-          end = s.find('        if (timerActive && seconds > 0) {', start)
-          if start < 0 or end < 0:
-              raise SystemExit("Dialogo del peso non trovato")
-          dialog = '''        if (weightDialogSet >= 0) {
-              val chosenSet = weightDialogSet
-              AlertDialog(
-                  onDismissRequest = { weightDialogSet = -1 },
-                  title = { Text("PESO • SERIE ${chosenSet + 1}", color = White, fontWeight = FontWeight.Black) },
-                  text = {
-                      Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                          Text("INSERISCI IL CARICO USATO", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                          androidx.compose.foundation.text.BasicTextField(
-                              value = weightInput,
-                              onValueChange = { value -> weightInput = value.filter { it.isDigit() || it == '.' || it == ',' } },
-                              singleLine = true,
-                              textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold),
-                              modifier = Modifier.fillMaxWidth().background(Panel2, RoundedCornerShape(10.dp)).padding(14.dp)
-                          )
-                          Text("KG • Puoi inserire anche valori decimali", color = Red, fontSize = 10.sp)
-                      }
-                  },
-                  confirmButton = {
-                      TextButton(onClick = {
-                          val normalized = weightInput.trim().replace(',', '.')
-                          val key = "weight_${day}_${selected}_${chosenSet}"
-                          if (normalized.isBlank()) prefs.edit().remove(key).apply()
-                          else prefs.edit().putString(key, normalized).apply()
-                          weightDialogSet = -1
-                      }) { Text("SALVA", color = Red, fontWeight = FontWeight.Black) }
-                  },
-                  dismissButton = { TextButton(onClick = { weightDialogSet = -1 }) { Text("ANNULLA", color = Muted) } },
-                  containerColor = Panel,
-                  titleContentColor = White,
-                  textContentColor = White
-              )
-          }
-'''
-          s = s[:start] + dialog + s[end:]
-          p.write_text(s, encoding="utf-8")
-          print("Peso inseribile manualmente per ogni serie, anche con decimali, e salvato automaticamente.")
+          print("Added direct manual kg entry with decimals for each individual set")
           PY
 
       - name: Add PESI screen
