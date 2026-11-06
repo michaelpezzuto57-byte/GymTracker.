@@ -890,7 +890,7 @@ jobs:
                       }
                   }
               }
-"""
+          """
           if "if (drawerOpen) {" not in s:
               anchor = "            // Red racing slashes and subtle carbon-like diagonal accents."
               if s.count(anchor) != 1:
