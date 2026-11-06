@@ -854,16 +854,16 @@ jobs:
           if 'private fun Header(onMenuClick: () -> Unit)' not in s:
               s = s.replace("private fun Header() {", "private fun Header(onMenuClick: () -> Unit) {", 1)
               header_start = s.find("private fun Header(onMenuClick: () -> Unit)")
-              header_end = s.find("\\n@Composable", header_start)
+              header_end = s.find("\n@Composable", header_start)
               if header_start < 0 or header_end < 0:
                   raise SystemExit("Header function boundaries not found")
               header = s[header_start:header_end]
               anchor = '        Column(Modifier.weight(1f)) {'
               if header.count(anchor) != 1:
                   raise SystemExit("Header logo column not found uniquely")
-              header = header.replace(anchor, '        TextButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) { Text("☰", color = Red, fontSize = 27.sp) }\\n        Spacer(Modifier.width(8.dp))\\n' + anchor, 1)
-              header = header.replace('        Text("RS4", color = Color(0xFF777777), fontSize = 32.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)\\n', '')
-              header = header.replace('        Text("125", color = Red, fontSize = 13.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Bottom))\\n', '')
+              header = header.replace(anchor, '        TextButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) { Text("☰", color = Red, fontSize = 27.sp) }\n        Spacer(Modifier.width(8.dp))\n' + anchor, 1)
+              header = header.replace('        Text("RS4", color = Color(0xFF777777), fontSize = 32.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)\n', '')
+              header = header.replace('        Text("125", color = Red, fontSize = 13.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Bottom))\n', '')
               s = s[:header_start] + header + s[header_end:]
 
           # Make the selected screen content vertically scrollable with a finger.
@@ -941,7 +941,7 @@ jobs:
           if '"STATISTICHE" -> StatsScreen(history)' not in s:
               if s.count(route_anchor) != 1:
                   raise SystemExit("PESI route not found for progress screens")
-              s = s.replace(route_anchor, route_anchor + "\\n" + routes, 1)
+              s = s.replace(route_anchor, route_anchor + "\n" + routes, 1)
 
           if 'val dateKey = java.text.SimpleDateFormat' not in s:
               anchor = '                        if (finish) {'
@@ -1035,7 +1035,7 @@ jobs:
 
           '''
           if "private fun StatsScreen" not in s:
-              anchor = "@Composable\\nprivate fun Header(onMenuClick: () -> Unit)"
+              anchor = "@Composable\nprivate fun Header(onMenuClick: () -> Unit)"
               if s.count(anchor) != 1:
                   raise SystemExit("Header insertion point not found for progress screens")
               s = s.replace(anchor, screens + anchor, 1)
