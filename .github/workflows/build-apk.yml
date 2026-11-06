@@ -1054,14 +1054,16 @@ jobs:
           # The header stays outside the scroll container. The selected screen
           # occupies the remaining height and scrolls; the bottom navigation
           # stays anchored without a second weighted spacer creating a black void.
-          old = """                }
-                Spacer(Modifier.weight(1f))
-                BottomNav(tab) { tab = it }"""
-          new = """                }
-                BottomNav(tab) { tab = it }"""
-          if s.count(old) != 1:
-              raise SystemExit("Main layout bottom spacer anchor not found uniquely; stopping safely")
-          s = s.replace(old, new, 1)
+          import re
+          # Remove only the weighted spacer directly before BottomNav.
+          s, removed = re.subn(
+              r"(?m)^[ \\t]*Spacer\\(Modifier\\.weight\\(1f\\)\\)\\n(?=[ \\t]*BottomNav\\(tab\\) \\{ tab = it \\})",
+              "",
+              s,
+              count=1
+          )
+          if removed != 1:
+              raise SystemExit("Main layout bottom spacer not found immediately before BottomNav")
           scroll_anchor = "Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()))"
           if s.count(scroll_anchor) != 1:
               raise SystemExit("Scrollable content container not found uniquely")
