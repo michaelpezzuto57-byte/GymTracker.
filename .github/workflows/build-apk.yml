@@ -853,10 +853,27 @@ jobs:
 
           if 'private fun Header(onMenuClick: () -> Unit)' not in s:
               s = s.replace("private fun Header() {", "private fun Header(onMenuClick: () -> Unit) {", 1)
-              anchor = '        Text("125", color = Red, fontSize = 13.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Bottom))'
+              anchor = '        Column(Modifier.weight(1f)) {'
               if s.count(anchor) != 1:
-                  raise SystemExit("Header right-side anchor not found")
-              s = s.replace(anchor, anchor + '\n        TextButton(onClick = onMenuClick) { Text("☰", color = Red, fontSize = 27.sp) }', 1)
+                  raise SystemExit("Header left-side anchor not found uniquely")
+              s = s.replace(anchor, '        TextButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) { Text("☰", color = Red, fontSize = 27.sp) }\n        Spacer(Modifier.width(8.dp))\n' + anchor, 1)
+
+          # Make the selected screen content vertically scrollable with a finger.
+          if "import androidx.compose.foundation.verticalScroll" not in s:
+              anchor = "import androidx.compose.foundation.clickable"
+              if s.count(anchor) != 1:
+                  raise SystemExit("Foundation import anchor not found")
+              s = s.replace(anchor, anchor + "\\nimport androidx.compose.foundation.verticalScroll\\nimport androidx.compose.foundation.rememberScrollState", 1)
+          start_token = "                when (tab) {"
+          end_token = "                Spacer(Modifier.weight(1f))"
+          start = s.find(start_token)
+          end = s.find(end_token, start + len(start_token))
+          if start < 0 or end < 0:
+              raise SystemExit("Could not locate screen navigation block for scrolling")
+          block = s[start:end].rstrip()
+          indented = "\\n".join(("    " + line) if line else line for line in block.splitlines())
+          wrapped = "                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {\\n" + indented + "\\n                }\\n"
+          s = s[:start] + wrapped + s[end:]
 
           profile_route = '                    "PROFILE" -> Column(Modifier.fillMaxWidth().background(Panel).padding(18.dp)) {\n                        Text("PROFILO", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)\n                        Text("ACCOUNT COLLEGATO", color = Red, fontSize = 10.sp)\n                        Text(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: "Account", color = White, fontSize = 15.sp)\n                        TextButton(onClick = { tab = "HOME" }) { Text("TORNA ALL\'ALLENAMENTO", color = Red) }\n                    }\n'
           if '"PROFILE" -> Column(' not in s:
