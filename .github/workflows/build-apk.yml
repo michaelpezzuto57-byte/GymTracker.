@@ -387,43 +387,7 @@ jobs:
           s = s.replace(old_row, new_row)
 
           old_after = '            }\n        }\n        if (timerActive && seconds > 0) {'
-          new_after = '''            }
-        }
-        if (weightDialogSet >= 0) {
-            val chosenSet = weightDialogSet
-            AlertDialog(
-                onDismissRequest = { weightDialogSet = -1 },
-                title = { Text("PESO • SERIE ${chosenSet + 1}", color = White, fontWeight = FontWeight.Black) },
-                text = {
-                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        Text("INSERISCI IL CARICO USATO", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                        androidx.compose.foundation.text.BasicTextField(
-                            value = weightInput,
-                            onValueChange = { value -> weightInput = value.filter { it.isDigit() || it == '.' || it == ',' } },
-                            singleLine = true,
-                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),
-                            textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold),
-                            modifier = Modifier.fillMaxWidth().background(Panel2, RoundedCornerShape(10.dp)).padding(14.dp)
-                        )
-                        Text("KG • Puoi inserire anche valori decimali", color = Red, fontSize = 10.sp)
-                    }
-                },
-                confirmButton = {
-                    TextButton(onClick = {
-                        val normalized = weightInput.trim().replace(',', '.')
-                        val key = "weight_${day}_${selected}_${chosenSet}"
-                        if (normalized.isBlank()) prefs.edit().remove(key).apply()
-                        else prefs.edit().putString(key, normalized).apply()
-                        weightDialogSet = -1
-                    }) { Text("SALVA", color = Red, fontWeight = FontWeight.Black) }
-                },
-                dismissButton = { TextButton(onClick = { weightDialogSet = -1 }) { Text("ANNULLA", color = Muted) } },
-                containerColor = Panel,
-                titleContentColor = White,
-                textContentColor = White
-            )
-        }
-        if (timerActive && seconds > 0) {'''
+          new_after = "            }\n        }\n        if (weightDialogSet >= 0) {\n            val chosenSet = weightDialogSet\n            AlertDialog(\n                onDismissRequest = { weightDialogSet = -1 },\n                title = { Text(\"PESO • SERIE ${chosenSet + 1}\", color = White, fontWeight = FontWeight.Black) },\n                text = {\n                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {\n                        Text(\"INSERISCI IL CARICO USATO\", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)\n                        androidx.compose.foundation.text.BasicTextField(\n                            value = weightInput,\n                            onValueChange = { value -> weightInput = value.filter { it.isDigit() || it == '.' || it == ',' } },\n                            singleLine = true,\n                            keyboardOptions = androidx.compose.foundation.text.KeyboardOptions(keyboardType = androidx.compose.ui.text.input.KeyboardType.Decimal),\n                            textStyle = androidx.compose.ui.text.TextStyle(color = White, fontSize = 22.sp, fontWeight = FontWeight.Bold),\n                            modifier = Modifier.fillMaxWidth().background(Panel2, RoundedCornerShape(10.dp)).padding(14.dp)\n                        )\n                        Text(\"KG • Puoi inserire anche valori decimali\", color = Red, fontSize = 10.sp)\n                    }\n                },\n                confirmButton = {\n                    TextButton(onClick = {\n                        val normalized = weightInput.trim().replace(',', '.')\n                        val key = \"weight_${day}_${selected}_${chosenSet}\"\n                        if (normalized.isBlank()) prefs.edit().remove(key).apply()\n                        else prefs.edit().putString(key, normalized).apply()\n                        weightDialogSet = -1\n                    }) { Text(\"SALVA\", color = Red, fontWeight = FontWeight.Black) }\n                },\n                dismissButton = { TextButton(onClick = { weightDialogSet = -1 }) { Text(\"ANNULLA\", color = Muted) } },\n                containerColor = Panel,\n                titleContentColor = White,\n                textContentColor = White\n            )\n        }\n        if (timerActive && seconds > 0) {"
           if s.count(old_after) != 1:
               raise SystemExit("Could not locate timer block")
           s = s.replace(old_after, new_after)
