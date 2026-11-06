@@ -1543,7 +1543,7 @@ jobs:
           }
 
           """
-              val anchor = "@Composable\nprivate fun ExerciseGuideScreen("
+              anchor = "@Composable\nprivate fun ExerciseGuideScreen("
               if (s.count(anchor) != 1):
                   raise SystemExit("Punto di inserimento illustrazioni non trovato")
               s = s.replace(anchor, drawing + anchor, 1)
