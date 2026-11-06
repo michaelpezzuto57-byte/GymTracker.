@@ -1504,11 +1504,13 @@ jobs:
 
           # Replace the emoji placeholder in each exercise card with a drawn
           # illustration whose equipment/body position changes by exercise.
-          old = '''                                  Text("🏋️", fontSize = 25.sp)'''
-          new = '''                                  ExerciseThumbnail(ex.name, Modifier.fillMaxSize().padding(5.dp))'''
-          if s.count(old) != 1:
-              raise SystemExit("Segnaposto immagine esercizio non trovato una sola volta")
-          s = s.replace(old, new, 1)
+          import re
+          # Be tolerant of formatting changes and repeated workflow runs.
+          if "ExerciseThumbnail(ex.name" not in s:
+              pattern = r'Text\("🏋️",\s*fontSize\s*=\s*25\.sp\)'
+              s, count = re.subn(pattern, 'ExerciseThumbnail(ex.name, Modifier.fillMaxSize().padding(5.dp))', s, count=1)
+              if count != 1:
+                  raise SystemExit("Scheda esercizio: punto immagine non trovato; nessuna modifica distruttiva eseguita")
 
           if "private fun ExerciseThumbnail(" not in s:
               drawing = r"""
