@@ -1280,7 +1280,7 @@ jobs:
           s = p.read_text(encoding="utf-8")
           old = ".verticalScroll(rememberScrollState())"
           new = """.then(
-                      if (tab in listOf("WORKOUT", "STORICO", "ESERCIZI")) Modifier
+                      if (tab in listOf("WORKOUT", "STORICO")) Modifier
                       else Modifier.verticalScroll(rememberScrollState())
                   )"""
           if s.count(old) != 1:
