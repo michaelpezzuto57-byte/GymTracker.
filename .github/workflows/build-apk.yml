@@ -1130,7 +1130,7 @@ jobs:
           if end is None:
               raise SystemExit("Blocco Header non chiuso")
           header = s[start:end]
-          header = re.sub(r"private fun Header\s*\([^)]*\)", "private fun Header(onMenuClick: () -> Unit)", header, count=1)
+          header = "private fun Header(onMenuClick: () -> Unit) {" + header[header.find("{") + 1:]
           # Remove old model/vehicle branding from the header.
           header = re.sub(r'^\s*Text\("(?:RS4|125)"[^\n]*\)\s*\n?', "", header, flags=re.M)
           if "onClick = onMenuClick" not in header:
