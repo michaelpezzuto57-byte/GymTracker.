@@ -1157,7 +1157,8 @@ jobs:
                   )
               }"""
           if scroll not in s: raise SystemExit("Area scorrevole centrale non trovata")
-          s = s.replace(scroll, scroll + swipe, 1)
+          # Attach the gesture modifier to the Modifier chain, before closing Column(...).
+          s = s.replace(scroll, scroll[:-1] + swipe + ")", 1)
           if s.count(scroll) != 1:
               raise SystemExit("Contenitore scorrevole non presente o duplicato: layout non modificato")
           if "Header { drawerOpen = true }" not in s:
