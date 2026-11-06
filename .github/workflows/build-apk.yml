@@ -1162,19 +1162,7 @@ jobs:
 
           # Keep the header and bottom navigation outside the scroll container.
           scroll = "Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()))"
-          swipe = """.pointerInput(tab) {
-                  var drag = 0f
-                  detectHorizontalDragGestures(
-                      onHorizontalDrag = { change, amount -> change.consume(); drag += amount },
-                      onDragEnd = {
-                          val pages = listOf("HOME", "PESI", "STORICO", "STATISTICHE", "CALENDARIO", "RECORD", "PROFILE")
-                          val index = pages.indexOf(tab)
-                          if (index >= 0 && drag < -70f && index < pages.lastIndex) tab = pages[index + 1]
-                          else if (index > 0 && drag > 70f) tab = pages[index - 1]
-                          drag = 0f
-                      }
-                  )
-              }"""
+          swipe = ""
           if scroll not in s: raise SystemExit("Area scorrevole centrale non trovata")
           # Attach the gesture modifier to the Modifier chain, before closing Column(...).
           s = s.replace(scroll, scroll[:-1] + swipe + ")", 1)
@@ -1483,6 +1471,84 @@ jobs:
               s += "\n\n" + guide
           p.write_text(s, encoding="utf-8")
           print("Sezione PESI sostituita con ESERCIZI AI: schede A/B/C, ricerca e guide per esercizio.")
+          PY
+
+      - name: Fix vertical scrolling and add visible exercise illustrations
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+
+          # Remove the horizontal drag detector: vertical scrolling must never
+          # change the selected page. Navigation remains available through tabs/menu.
+          marker = ".pointerInput(tab) {"
+          if marker in s:
+              start = s.index(marker)
+              brace = s.index("{", start)
+              depth = 0
+              end = None
+              for i in range(brace, len(s)):
+                  if s[i] == "{": depth += 1
+                  elif s[i] == "}":
+                      depth -= 1
+                      if depth == 0:
+                          end = i + 1
+                          break
+              if end is None:
+                  raise SystemExit("Blocco swipe orizzontale non chiuso")
+              s = s[:start] + s[end:]
+          if ".pointerInput(tab)" in s:
+              raise SystemExit("Rilevatore swipe ancora presente")
+
+          # Replace the emoji placeholder in each exercise card with a drawn
+          # illustration whose equipment/body position changes by exercise.
+          old = '''                                  Text("🏋️", fontSize = 25.sp)'''
+          new = '''                                  ExerciseThumbnail(ex.name, Modifier.fillMaxSize().padding(5.dp))'''
+          if s.count(old) != 1:
+              raise SystemExit("Segnaposto immagine esercizio non trovato una sola volta")
+          s = s.replace(old, new, 1)
+
+          if "private fun ExerciseThumbnail(" not in s:
+              drawing = r"""
+          @Composable
+          private fun ExerciseThumbnail(name: String, modifier: Modifier = Modifier) {
+              androidx.compose.foundation.Canvas(modifier) {
+                  val n = name.lowercase()
+                  val red = Color(0xFFE21B2D)
+                  val white = Color(0xFFEAEAEA)
+                  val muted = Color(0xFF777777)
+                  val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 5f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                  val cx = size.width * 0.5f
+                  val cy = size.height * 0.48f
+                  val horizontal = listOf("panca", "chest", "bench", "curl", "rematore", "pulley", "row").any { n.contains(it) }
+                  val leg = listOf("squat", "pressa", "affondi", "leg", "stacco").any { n.contains(it) }
+                  drawCircle(white, radius = size.minDimension * 0.10f, center = androidx.compose.ui.geometry.Offset(cx, cy - size.height * 0.25f), style = stroke)
+                  drawLine(white, androidx.compose.ui.geometry.Offset(cx, cy - size.height * 0.13f), androidx.compose.ui.geometry.Offset(cx, cy + size.height * 0.20f), 5f)
+                  drawLine(white, androidx.compose.ui.geometry.Offset(cx, cy - size.height * 0.04f), androidx.compose.ui.geometry.Offset(cx - size.width * 0.25f, cy + size.height * 0.04f), 4f)
+                  drawLine(white, androidx.compose.ui.geometry.Offset(cx, cy - size.height * 0.04f), androidx.compose.ui.geometry.Offset(cx + size.width * 0.25f, cy + size.height * 0.04f), 4f)
+                  drawLine(white, androidx.compose.ui.geometry.Offset(cx, cy + size.height * 0.20f), androidx.compose.ui.geometry.Offset(cx - size.width * 0.18f, cy + size.height * 0.42f), 4f)
+                  drawLine(white, androidx.compose.ui.geometry.Offset(cx, cy + size.height * 0.20f), androidx.compose.ui.geometry.Offset(cx + size.width * 0.18f, cy + size.height * 0.42f), 4f)
+                  if (leg) {
+                      drawLine(red, androidx.compose.ui.geometry.Offset(cx - size.width * 0.30f, cy + size.height * 0.43f), androidx.compose.ui.geometry.Offset(cx + size.width * 0.30f, cy + size.height * 0.43f), 5f)
+                  } else {
+                      val barY = if (horizontal) cy - size.height * 0.08f else cy + size.height * 0.02f
+                      drawLine(red, androidx.compose.ui.geometry.Offset(cx - size.width * 0.39f, barY), androidx.compose.ui.geometry.Offset(cx + size.width * 0.39f, barY), 5f)
+                      drawCircle(red, 4f, androidx.compose.ui.geometry.Offset(cx - size.width * 0.39f, barY))
+                      drawCircle(red, 4f, androidx.compose.ui.geometry.Offset(cx + size.width * 0.39f, barY))
+                  }
+                  drawLine(muted, androidx.compose.ui.geometry.Offset(size.width * 0.12f, size.height * 0.88f), androidx.compose.ui.geometry.Offset(size.width * 0.88f, size.height * 0.88f), 2f)
+              }
+          }
+
+          """
+              val anchor = "@Composable\nprivate fun ExerciseGuideScreen("
+              if (s.count(anchor) != 1):
+                  raise SystemExit("Punto di inserimento illustrazioni non trovato")
+              s = s.replace(anchor, drawing + anchor, 1)
+          p.write_text(s, encoding="utf-8")
+          print("Swipe laterale rimosso; miniature illustrate visibili aggiunte alle schede esercizio.")
           PY
 
       - name: Build APK
