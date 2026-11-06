@@ -1168,6 +1168,102 @@ jobs:
           print("Header fissato, pulsante menu a sinistra verificato, contenuto centrale con verticalScroll.")
           PY
 
+      - name: Apply approved Racing dashboard layout
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+          pattern = r'@Composable\nprivate fun HomeScreen\(.*?\n}\n(?=\n@Composable\nprivate fun WorkoutScreen)'
+          replacement = r'''@Composable
+          private fun HomeScreen(day: String, onDay: (String) -> Unit, start: () -> Unit) {
+              val titles = mapOf("A" to "PETTO + TRICIPITI", "B" to "DORSO + BICIPITI", "C" to "GAMBE + ADDOMINALI")
+              val subtitles = mapOf("A" to "SPINTA  •  FORZA", "B" to "TRAZIONE  •  CONTROLLO", "C" to "POTENZA  •  CORE")
+              val exerciseCount = routines[day]!!.size
+              val setCount = routines[day]!!.sumOf { it.sets }
+              Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                  Row(verticalAlignment = Alignment.Bottom, modifier = Modifier.fillMaxWidth()) {
+                      Column(Modifier.weight(1f)) {
+                          Text("DASHBOARD", color = White, fontSize = 25.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)
+                          Text("IL TUO ALLENAMENTO, SOTTO CONTROLLO", color = Red, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.1.sp)
+                      }
+                      Text("01 / 03", color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Bold)
+                  }
+                  Column(
+                      Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp))
+                          .background(Brush.linearGradient(listOf(Color(0xFF2A080D), Panel, Color(0xFF090909))))
+                          .border(1.dp, RedDark, RoundedCornerShape(18.dp)).padding(16.dp),
+                      verticalArrangement = Arrangement.spacedBy(10.dp)
+                  ) {
+                      Row(verticalAlignment = Alignment.CenterVertically) {
+                          Text("SESSIONE SELEZIONATA", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.2.sp, modifier = Modifier.weight(1f))
+                          Box(Modifier.clip(RoundedCornerShape(5.dp)).background(Red.copy(alpha = 0.16f)).padding(horizontal = 8.dp, vertical = 4.dp)) {
+                              Text("PRONTO", color = Red, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                          }
+                      }
+                      Row(verticalAlignment = Alignment.CenterVertically) {
+                          Text(day, color = Red, fontSize = 62.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)
+                          Spacer(Modifier.width(14.dp))
+                          Column(Modifier.weight(1f)) {
+                              Text(titles[day] ?: "ALLENAMENTO", color = White, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                              Text(subtitles[day] ?: "", color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.7.sp)
+                          }
+                      }
+                      HorizontalDivider(color = RedDark)
+                      Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                          Column(Modifier.weight(1f)) {
+                              Text(exerciseCount.toString(), color = White, fontSize = 23.sp, fontWeight = FontWeight.Black)
+                              Text("ESERCIZI", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                          }
+                          Column(Modifier.weight(1f)) {
+                              Text(setCount.toString(), color = White, fontSize = 23.sp, fontWeight = FontWeight.Black)
+                              Text("SERIE TOTALI", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                          }
+                          Column(Modifier.weight(1f)) {
+                              Text("90s", color = Red, fontSize = 23.sp, fontWeight = FontWeight.Black)
+                              Text("RECUPERO", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                          }
+                      }
+                  }
+                  Text("SCEGLI LA SCHEDA", color = White, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                  Row(horizontalArrangement = Arrangement.spacedBy(9.dp), modifier = Modifier.fillMaxWidth()) {
+                      listOf("A", "B", "C").forEach { d ->
+                          val selected = day == d
+                          Column(
+                              Modifier.weight(1f).height(112.dp).clip(RoundedCornerShape(14.dp))
+                                  .background(if (selected) Brush.verticalGradient(listOf(Color(0xFF3A0A10), Panel)) else Brush.verticalGradient(listOf(Panel2, Panel)))
+                                  .border(if (selected) 1.5.dp else 1.dp, if (selected) Red else RedDark, RoundedCornerShape(14.dp))
+                                  .clickable { onDay(d) }.padding(10.dp),
+                              verticalArrangement = Arrangement.SpaceBetween
+                          ) {
+                              Text(d, color = if (selected) Red else White, fontSize = 34.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)
+                              Column {
+                                  Text("\${routines[d]!!.size} ESERCIZI", color = White, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                                  Text("\${routines[d]!!.sumOf { it.sets }} SERIE", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+                              }
+                              if (selected) Box(Modifier.fillMaxWidth().height(3.dp).clip(CircleShape).background(Red))
+                          }
+                      }
+                  }
+                  Button(
+                      onClick = start,
+                      modifier = Modifier.fillMaxWidth().height(54.dp),
+                      shape = RoundedCornerShape(12.dp),
+                      colors = ButtonDefaults.buttonColors(containerColor = Red)
+                  ) {
+                      Text("▶   INIZIA ALLENAMENTO", color = White, fontSize = 13.sp, fontWeight = FontWeight.Black, letterSpacing = 0.7.sp)
+                  }
+                  Text("IL TUO PROGRESSO VIENE SALVATO AUTOMATICAMENTE", color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold, letterSpacing = 0.5.sp, modifier = Modifier.fillMaxWidth(), textAlign = TextAlign.Center)
+              }
+          }'''
+          s2, n = re.subn(pattern, replacement, s, count=1, flags=re.S)
+          if n != 1:
+              raise SystemExit("HomeScreen non individuata in modo univoco: dashboard non applicata")
+          p.write_text(s2, encoding="utf-8")
+          print("Dashboard Racing applicata: hero sessione, metriche, selezione A/B/C e pulsante principale.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
