@@ -926,6 +926,124 @@ jobs:
           print("Menu laterale, pagina profilo e uscita account aggiunti")
           PY
 
+      - name: Add statistics calendar and personal records
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+
+          route_anchor = '                    "PESI" -> WeightsScreen(day, prefs)'
+          routes = '''                    "STATISTICHE" -> StatsScreen(history)
+                              "CALENDARIO" -> CalendarScreen(prefs)
+                              "RECORD" -> RecordsScreen(prefs)'''
+          if '"STATISTICHE" -> StatsScreen(history)' not in s:
+              if s.count(route_anchor) != 1:
+                  raise SystemExit("PESI route not found for progress screens")
+              s = s.replace(route_anchor, route_anchor + "\\n" + routes, 1)
+
+          if 'val dateKey = java.text.SimpleDateFormat' not in s:
+              anchor = '                        if (finish) {'
+              date_code = '''                        if (finish) {
+                                      val dateKey = java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date())
+                                      val dates = prefs.getStringSet("workout_dates", emptySet())?.toMutableSet() ?: mutableSetOf()
+                                      dates.add(dateKey)
+                                      prefs.edit().putStringSet("workout_dates", dates).apply()'''
+              if s.count(anchor) != 1:
+                  raise SystemExit("Workout finish block not found uniquely")
+              s = s.replace(anchor, date_code, 1)
+
+          screens = r'''@Composable
+          private fun StatsScreen(history: String) {
+              val sessions = history.lines().filter { it.isNotBlank() }
+              val completedSets = sessions.sumOf { line ->
+                  Regex("(\\d+)/(\\d+) serie").find(line)?.groupValues?.get(1)?.toIntOrNull() ?: 0
+              }
+              Column(Modifier.fillMaxWidth().padding(4.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                  Text("STATISTICHE", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                  Text("IL TUO ANDAMENTO", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                  listOf("ALLENAMENTI COMPLETATI" to sessions.size.toString(), "SERIE COMPLETATE" to completedSets.toString()).forEach { (label, value) ->
+                      Column(Modifier.fillMaxWidth().background(Panel).border(1.dp, RedDark, RoundedCornerShape(14.dp)).padding(16.dp)) {
+                          Text(label, color = Muted, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                          Text(value, color = Red, fontSize = 30.sp, fontWeight = FontWeight.Black)
+                      }
+                  }
+              }
+          }
+
+          @Composable
+          private fun CalendarScreen(prefs: android.content.SharedPreferences) {
+              val trained = prefs.getStringSet("workout_dates", emptySet()) ?: emptySet()
+              val month = java.time.YearMonth.now()
+              val offset = month.atDay(1).dayOfWeek.value - 1
+              val cells = List(offset) { 0 } + (1..month.lengthOfMonth()).toList()
+              Column(Modifier.fillMaxWidth().padding(4.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                  Text("CALENDARIO", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                  Text(month.month.name + " " + month.year, color = Red, fontWeight = FontWeight.Bold)
+                  Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                      listOf("L", "M", "M", "G", "V", "S", "D").forEach {
+                          Text(it, color = Muted, modifier = Modifier.weight(1f), textAlign = androidx.compose.ui.text.style.TextAlign.Center)
+                      }
+                  }
+                  cells.chunked(7).forEach { week ->
+                      Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                          week.forEach { day ->
+                              val key = if (day == 0) "" else month.atDay(day).toString()
+                              val done = key.isNotEmpty() && key in trained
+                              Box(Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(8.dp))
+                                  .background(if (done) Color(0xFF3A0A10) else Panel)
+                                  .border(1.dp, if (done) Red else RedDark, RoundedCornerShape(8.dp)),
+                                  contentAlignment = Alignment.Center) {
+                                  if (day > 0) Text(day.toString(), color = if (done) Red else White, fontWeight = if (done) FontWeight.Black else FontWeight.Normal)
+                              }
+                          }
+                          repeat(7 - week.size) { Spacer(Modifier.weight(1f)) }
+                      }
+                  }
+                  Text("I giorni rossi indicano un allenamento completato.", color = Muted, fontSize = 11.sp)
+              }
+          }
+
+          @Composable
+          private fun RecordsScreen(prefs: android.content.SharedPreferences) {
+              val exercises = routines.values.flatten().map { it.name.replace("*", "") }.distinct()
+              Column(Modifier.fillMaxWidth().padding(4.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                  Text("RECORD PERSONALI", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                  Text("INSERISCI IL TUO MIGLIOR CARICO", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                  exercises.forEach { exercise ->
+                      val key = "personal_record_" + exercise.hashCode()
+                      var value by remember(exercise) { mutableStateOf(prefs.getString(key, "") ?: "") }
+                      Row(Modifier.fillMaxWidth().background(Panel).border(1.dp, RedDark, RoundedCornerShape(10.dp)).padding(10.dp),
+                          verticalAlignment = Alignment.CenterVertically) {
+                          Text(exercise, color = White, fontSize = 12.sp, modifier = Modifier.weight(1f))
+                          androidx.compose.foundation.text.BasicTextField(
+                              value = value,
+                              onValueChange = { next ->
+                                  value = next.filter { it.isDigit() || it == ',' || it == '.' }
+                                  prefs.edit().putString(key, value).apply()
+                              },
+                              textStyle = androidx.compose.ui.text.TextStyle(color = Red, fontSize = 15.sp, fontWeight = FontWeight.Bold),
+                              modifier = Modifier.width(64.dp)
+                          )
+                          Text(" kg", color = Muted, fontSize = 10.sp)
+                      }
+                  }
+                  Text("I valori vengono salvati automaticamente.", color = Muted, fontSize = 11.sp)
+              }
+          }
+
+          '''
+          if "private fun StatsScreen" not in s:
+              anchor = "@Composable\\nprivate fun Header(onMenuClick: () -> Unit)"
+              if s.count(anchor) != 1:
+                  raise SystemExit("Header insertion point not found for progress screens")
+              s = s.replace(anchor, screens + anchor, 1)
+
+          p.write_text(s, encoding="utf-8")
+          print("Statistiche, calendario e record personali inseriti")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
