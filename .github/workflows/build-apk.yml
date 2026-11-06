@@ -1090,6 +1090,15 @@ jobs:
           s = p.read_text(encoding="utf-8")
 
           # Ensure the Compose scrolling APIs are imported.
+          extra_imports = [
+              "import androidx.compose.foundation.gestures.detectHorizontalDragGestures",
+              "import androidx.compose.ui.input.pointer.pointerInput",
+          ]
+          for imp in extra_imports:
+              if imp not in s:
+                  anchor = "import androidx.compose.foundation.layout.*"
+                  if anchor not in s: raise SystemExit("Import Compose non trovato")
+                  s = s.replace(anchor, anchor + chr(10) + imp, 1)
           for name in ("verticalScroll", "rememberScrollState"):
               imp = "import androidx.compose.foundation." + name
               if imp not in s:
@@ -1133,6 +1142,21 @@ jobs:
 
           # Keep the header and bottom navigation outside the scroll container.
           scroll = "Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()))"
+          swipe = """.pointerInput(tab) {
+                  var drag = 0f
+                  detectHorizontalDragGestures(
+                      onHorizontalDrag = { change, amount -> change.consume(); drag += amount },
+                      onDragEnd = {
+                          val pages = listOf("HOME", "PESI", "STORICO", "STATISTICHE", "CALENDARIO", "RECORD", "PROFILE")
+                          val index = pages.indexOf(tab)
+                          if (index >= 0 && drag < -70f && index < pages.lastIndex) tab = pages[index + 1]
+                          else if (index > 0 && drag > 70f) tab = pages[index - 1]
+                          drag = 0f
+                      }
+                  )
+              }"""
+          if scroll not in s: raise SystemExit("Area scorrevole centrale non trovata")
+          s = s.replace(scroll, scroll + swipe, 1)
           if s.count(scroll) != 1:
               raise SystemExit("Contenitore scorrevole non presente o duplicato: layout non modificato")
           if "Header { drawerOpen = true }" not in s:
