@@ -116,9 +116,9 @@ jobs:
           if len(compact) != 3712:
               print("Expected 3712 characters for the existing 2784-byte keystore.")
           PY
-          printf '%s' "$ANDROID_KEYSTORE_BASE64" | tr -d '\\r\\n ' | base64 --decode > "$KEYSTORE_PATH"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$KEYSTORE_PATH"
           test -s "$KEYSTORE_PATH"
-          export ANDROID_KEYSTORE_PATH="$KEYSTORE_PATH"
+          echo "ANDROID_KEYSTORE_PATH=$KEYSTORE_PATH" >> "$GITHUB_ENV"
           python3 - <<'PY'
           from pathlib import Path
           import os
@@ -837,6 +837,10 @@ jobs:
           python3 /tmp/add_menu.py
 
       - name: Build APK
+        env:
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: gradle -p "$PROJECT_DIR" assembleDebug
 
       - name: Upload APK
