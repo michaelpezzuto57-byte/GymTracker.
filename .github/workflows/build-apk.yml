@@ -1110,13 +1110,14 @@ jobs:
 
           # Find Header with brace matching, regardless of whether an earlier patch
           # already changed its signature.
-          match = re.search(r"private fun Header\s*\([^)]*\)\s*\{", s)
-          if not match:
-              match = re.search(r"private fun Header\s*\(\s*\)\s*\{", s)
-          if not match:
-              raise SystemExit("Funzione Header non trovata nel sorgente")
-          start = match.start()
-          brace = s.find("{", match.start())
+          # Function-type parameters contain nested parentheses; locate the
+          # declaration first, then find its body brace.
+          start = s.find("private fun Header")
+          if start < 0:
+              raise SystemExit("Dichiarazione private fun Header non trovata")
+          brace = s.find("{", start)
+          if brace < 0:
+              raise SystemExit("Inizio del corpo Header non trovato")
           depth = 0
           end = None
           for i in range(brace, len(s)):
