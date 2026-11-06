@@ -1355,76 +1355,145 @@ jobs:
               var selectedDay by remember { mutableStateOf(initialDay) }
               var search by remember { mutableStateOf("") }
               var selectedExercise by remember { mutableStateOf<Exercise?>(null) }
-              val exerciseList = routines[selectedDay].orEmpty()
-                  .filter { it.name.replace("*", "").contains(search, ignoreCase = true) }
-
-              Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                  Text("ESERCIZI AI", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)
-                  Text("GUIDE VISIVE DELLA TUA SCHEDA", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
-                  Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                      listOf("A", "B", "C").forEach { d ->
-                          Button(
-                              onClick = { selectedDay = d; selectedExercise = null },
-                              modifier = Modifier.weight(1f),
-                              colors = ButtonDefaults.buttonColors(containerColor = if (selectedDay == d) Red else Panel2)
-                          ) { Text("GIORNO $d", color = White, fontSize = 10.sp) }
-                      }
+              var selectedGroup by remember { mutableStateOf("TUTTI") }
+              fun groupFor(name: String): String {
+                  val n = name.lowercase()
+                  return when {
+                      listOf("panca", "croci", "chest", "petto", "push").any { n.contains(it) } -> "PETTO"
+                      listOf("squat", "leg", "pressa", "affondi", "polpacci", "stacco", "gambe", "femor").any { n.contains(it) } -> "GAMBE"
+                      listOf("curl", "bicip", "tricip", "pushdown", "french").any { n.contains(it) } -> "BRACCIA"
+                      listOf("military", "alzate", "spalle", "shoulder").any { n.contains(it) } -> "SPALLE"
+                      listOf("crunch", "plank", "addom", "sit up").any { n.contains(it) } -> "ADDOMINALI"
+                      listOf("lat", "rematore", "pulley", "traz", "dorso", "rowing").any { n.contains(it) } -> "DORSO"
+                      else -> "FITNESS"
                   }
-                  OutlinedTextField(
-                      value = search,
-                      onValueChange = { search = it },
-                      modifier = Modifier.fillMaxWidth(),
-                      singleLine = true,
-                      label = { Text("Cerca un esercizio", color = Muted) },
-                      colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
-                          focusedTextColor = White, unfocusedTextColor = White,
-                          focusedBorderColor = Red, unfocusedBorderColor = RedDark,
-                          focusedLabelColor = Red, unfocusedLabelColor = Muted,
-                          cursorColor = Red
-                      )
-                  )
-                  if (selectedExercise == null) {
-                      Text("SCEGLI UN ESERCIZIO", color = White, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                      exerciseList.forEach { ex ->
-                          Row(
-                              Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
-                                  .background(Panel).border(1.dp, RedDark, RoundedCornerShape(12.dp))
-                                  .clickable { selectedExercise = ex }.padding(14.dp),
-                              verticalAlignment = Alignment.CenterVertically
-                          ) {
-                              Column(Modifier.weight(1f)) {
-                                  Text(ex.name.replace("*", ""), color = White, fontWeight = FontWeight.Black)
-                                  Text("${ex.sets} SERIE • ${ex.reps} RIP.", color = Muted, fontSize = 10.sp)
+              }
+              val exerciseList = routines[selectedDay].orEmpty().filter {
+                  it.name.replace("*", "").contains(search, ignoreCase = true) &&
+                  (selectedGroup == "TUTTI" || groupFor(it.name) == selectedGroup)
+              }
+              val current = selectedExercise
+              Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                  if (current == null) {
+                      Row(verticalAlignment = Alignment.CenterVertically) {
+                          Column(Modifier.weight(1f)) {
+                              Text("ESERCIZI AI", color = White, fontSize = 23.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)
+                              Text("LA TUA ENCICLOPEDIA DI ALLENAMENTO", color = Red, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                          }
+                          Text("LIBRARY / 01", color = Muted, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                      }
+                      Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+                          listOf("A", "B", "C").forEach { d ->
+                              val active = selectedDay == d
+                              Column(Modifier.weight(1f).clip(RoundedCornerShape(11.dp)).background(if (active) Color(0xFF3A0A10) else Panel)
+                                  .border(1.dp, if (active) Red else RedDark, RoundedCornerShape(11.dp))
+                                  .clickable { selectedDay = d; selectedExercise = null }.padding(11.dp)) {
+                                  Text("GIORNO $d", color = if (active) Red else White, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                                  Text(when (d) { "A" -> "SPINTA"; "B" -> "TRAZIONE"; else -> "GAMBE" }, color = Muted, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                               }
-                              Text("VEDI GUIDA  ›", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Black)
                           }
                       }
-                      if (exerciseList.isEmpty()) Text("Nessun esercizio trovato.", color = Muted)
+                      OutlinedTextField(value = search, onValueChange = { search = it }, modifier = Modifier.fillMaxWidth(),
+                          singleLine = true, label = { Text("Cerca esercizio...", color = Muted) },
+                          colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                              focusedTextColor = White, unfocusedTextColor = White, focusedBorderColor = Red,
+                              unfocusedBorderColor = RedDark, focusedLabelColor = Red, unfocusedLabelColor = Muted, cursorColor = Red
+                          )
+                      )
+                      Text("GRUPPI MUSCOLARI", color = White, fontSize = 12.sp, fontWeight = FontWeight.Black)
+                      Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+                          listOf("PETTO", "DORSO", "GAMBE").forEach { g ->
+                              val active = selectedGroup == g
+                              Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (active) Color(0xFF3A0A10) else Panel)
+                                  .border(1.dp, if (active) Red else RedDark, RoundedCornerShape(10.dp))
+                                  .clickable { selectedGroup = if (active) "TUTTI" else g }.padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
+                                  Text(g, color = if (active) Red else White, fontSize = 9.sp, fontWeight = FontWeight.Black)
+                              }
+                          }
+                      }
+                      Row(horizontalArrangement = Arrangement.spacedBy(7.dp), modifier = Modifier.fillMaxWidth()) {
+                          listOf("SPALLE", "BRACCIA", "ADDOMINALI").forEach { g ->
+                              val active = selectedGroup == g
+                              Box(Modifier.weight(1f).clip(RoundedCornerShape(10.dp)).background(if (active) Color(0xFF3A0A10) else Panel)
+                                  .border(1.dp, if (active) Red else RedDark, RoundedCornerShape(10.dp))
+                                  .clickable { selectedGroup = if (active) "TUTTI" else g }.padding(vertical = 13.dp), contentAlignment = Alignment.Center) {
+                                  Text(g, color = if (active) Red else White, fontSize = 8.sp, fontWeight = FontWeight.Black)
+                              }
+                          }
+                      }
+                      Row(verticalAlignment = Alignment.CenterVertically) {
+                          Text("ESERCIZI DEL GIORNO $selectedDay", color = White, fontSize = 12.sp, fontWeight = FontWeight.Black, modifier = Modifier.weight(1f))
+                          Text("\${exerciseList.size} RISULTATI", color = Red, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                      }
+                      exerciseList.forEach { ex ->
+                          Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel)
+                              .border(1.dp, RedDark, RoundedCornerShape(12.dp)).clickable { selectedExercise = ex }.padding(12.dp),
+                              verticalAlignment = Alignment.CenterVertically) {
+                              Box(Modifier.size(54.dp).clip(RoundedCornerShape(9.dp)).background(Color(0xFF26090D)), contentAlignment = Alignment.Center) {
+                                  Text("🏋️", fontSize = 25.sp)
+                              }
+                              Spacer(Modifier.width(11.dp))
+                              Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
+                                  Text(ex.name.replace("*", ""), color = White, fontWeight = FontWeight.Black, fontSize = 13.sp)
+                                  Text(groupFor(ex.name), color = Red, fontSize = 8.sp, fontWeight = FontWeight.Black, letterSpacing = 0.8.sp)
+                                  Text("\${ex.sets} SERIE  •  \${ex.reps} RIP.", color = Muted, fontSize = 9.sp)
+                              }
+                              Text("›", color = Red, fontSize = 26.sp, fontWeight = FontWeight.Black)
+                          }
+                      }
+                      if (exerciseList.isEmpty()) Text("Nessun esercizio trovato in questa categoria.", color = Muted, fontSize = 11.sp)
                   } else {
-                      val ex = selectedExercise!!
-                      TextButton(onClick = { selectedExercise = null }) { Text("‹ TORNA AGLI ESERCIZI", color = Red) }
-                      Text(ex.name.replace("*", ""), color = White, fontSize = 20.sp, fontWeight = FontWeight.Black)
-                      Box(
-                          Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp))
-                              .background(Color(0xFF171717)).border(1.dp, RedDark, RoundedCornerShape(16.dp)),
-                          contentAlignment = Alignment.Center
-                      ) {
-                          Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                              Text("🏋️", fontSize = 54.sp)
-                              Text("ILLUSTRAZIONE DEL MOVIMENTO", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Black)
-                              Text("Guida dell'esercizio selezionato", color = Muted, fontSize = 10.sp)
+                      TextButton(onClick = { selectedExercise = null }) { Text("‹  TUTTI GLI ESERCIZI", color = Red, fontWeight = FontWeight.Black) }
+                      Text(current.name.replace("*", ""), color = White, fontSize = 22.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)
+                      Text("\${groupFor(current.name)}  •  GUIDA TECNICA", color = Red, fontSize = 9.sp, fontWeight = FontWeight.Black, letterSpacing = 1.sp)
+                      Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
+                          listOf("POSIZIONE INIZIALE", "FASE DEL MOVIMENTO").forEachIndexed { i, label ->
+                              Column(Modifier.weight(1f).clip(RoundedCornerShape(12.dp)).background(Panel)
+                                  .border(1.dp, RedDark, RoundedCornerShape(12.dp)).padding(8.dp)) {
+                                  Box(Modifier.fillMaxWidth().height(112.dp).background(Color(0xFF171717)), contentAlignment = Alignment.Center) {
+                                      androidx.compose.foundation.Canvas(Modifier.fillMaxSize().padding(8.dp)) {
+                                          val cx = size.width * 0.5f
+                                          val h = size.height
+                                          val red = Color(0xFFE21B2D)
+                                          val pale = Color(0xFFE8E8E8)
+                                          val line = androidx.compose.ui.graphics.drawscope.Stroke(width = 5f, cap = androidx.compose.ui.graphics.StrokeCap.Round)
+                                          drawCircle(pale, radius = 11f, center = androidx.compose.ui.geometry.Offset(cx, h * 0.22f), style = line)
+                                          drawLine(pale, androidx.compose.ui.geometry.Offset(cx, h * 0.32f), androidx.compose.ui.geometry.Offset(cx, h * 0.63f), 6f)
+                                          drawLine(pale, androidx.compose.ui.geometry.Offset(cx, h * 0.42f), androidx.compose.ui.geometry.Offset(cx - 25f, h * 0.54f), 5f)
+                                          drawLine(pale, androidx.compose.ui.geometry.Offset(cx, h * 0.42f), androidx.compose.ui.geometry.Offset(cx + 25f, h * 0.54f), 5f)
+                                          drawLine(pale, androidx.compose.ui.geometry.Offset(cx, h * 0.63f), androidx.compose.ui.geometry.Offset(cx - 18f, h * 0.88f), 5f)
+                                          drawLine(pale, androidx.compose.ui.geometry.Offset(cx, h * 0.63f), androidx.compose.ui.geometry.Offset(cx + 18f, h * 0.88f), 5f)
+                                          val barY = h * if (i == 0) 0.38f else 0.30f
+                                          drawLine(red, androidx.compose.ui.geometry.Offset(cx - 37f, barY), androidx.compose.ui.geometry.Offset(cx + 37f, barY), 5f)
+                                          drawCircle(red, radius = 5f, center = androidx.compose.ui.geometry.Offset(cx - 40f, barY))
+                                          drawCircle(red, radius = 5f, center = androidx.compose.ui.geometry.Offset(cx + 40f, barY))
+                                      }
+                                  }
+                                  Spacer(Modifier.height(7.dp))
+                                  Text(label, color = White, fontSize = 8.sp, fontWeight = FontWeight.Black, textAlign = TextAlign.Center, modifier = Modifier.fillMaxWidth())
+                              }
                           }
                       }
-                      Text("COME ESEGUIRLO", color = Red, fontWeight = FontWeight.Black, fontSize = 12.sp)
-                      listOf(
-                          "1. Posizionati e prepara l'attrezzatura in modo stabile.",
-                          "2. Esegui il movimento lentamente, senza slanci e mantenendo il controllo.",
-                          "3. Torna alla posizione iniziale in modo controllato."
-                      ).forEach { instruction ->
-                          Text(instruction, color = White, fontSize = 12.sp,
-                              modifier = Modifier.fillMaxWidth().background(Panel).padding(12.dp))
+                      Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                          Text("MUSCOLI COINVOLTI", color = Red, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                          Text(groupFor(current.name), color = White, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                          Text("Il gruppo muscolare principale è evidenziato nella guida. I muscoli di supporto dipendono dalla variante e dall'esecuzione.", color = Muted, fontSize = 10.sp)
                       }
-                      Text("Consiglio: usa un carico gestibile e interrompi la serie se senti dolore.", color = Muted, fontSize = 11.sp)
+                      Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).padding(13.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                          Text("COME ESEGUIRLO", color = Red, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                          listOf("Sistema l'attrezzatura e assumi una posizione stabile.",
+                              "Esegui il movimento con controllo, senza slanci.",
+                              "Mantieni una respirazione regolare e torna lentamente alla posizione iniziale.").forEachIndexed { index, instruction ->
+                              Row(verticalAlignment = Alignment.Top, horizontalArrangement = Arrangement.spacedBy(9.dp)) {
+                                  Text("\${index + 1}", color = Red, fontSize = 16.sp, fontWeight = FontWeight.Black)
+                                  Text(instruction, color = White, fontSize = 11.sp, modifier = Modifier.weight(1f))
+                              }
+                          }
+                      }
+                      Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Color(0xFF26090D)).padding(13.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                          Text("ERRORI DA EVITARE", color = Red, fontSize = 11.sp, fontWeight = FontWeight.Black)
+                          Text("• Non usare slanci o carichi che non riesci a controllare.\n• Non forzare articolazioni o ampiezza del movimento.\n• Se non conosci l'esercizio, chiedi al trainer di mostrarti la tecnica corretta.", color = White, fontSize = 10.sp)
+                      }
                   }
               }
           }
