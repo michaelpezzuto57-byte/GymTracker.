@@ -1292,7 +1292,7 @@ jobs:
           s = p.read_text(encoding="utf-8")
           old = ".verticalScroll(rememberScrollState())"
           new = """.then(
-                      if (tab in listOf("WORKOUT", "STORICO", "PESI")) Modifier
+                      if (tab in listOf("WORKOUT", "STORICO", "ESERCIZI")) Modifier
                       else Modifier.verticalScroll(rememberScrollState())
                   )"""
           if s.count(old) != 1:
@@ -1300,25 +1300,6 @@ jobs:
           s = s.replace(old, new, 1)
           p.write_text(s, encoding="utf-8")
           print("Scroll annidato disattivato in Allenamento, Pesi e Storico; scroll generale mantenuto nelle altre schermate.")
-          PY
-
-      - name: Stabilize PESI screen scrolling
-        run: |
-          python3 - <<'PY'
-          from pathlib import Path
-          import os
-          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
-          s = p.read_text(encoding="utf-8")
-          old = '''                  LazyColumn(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                      itemsIndexed(routines[d]!!) { i, ex ->'''
-          new = '''                  Column(Modifier.weight(1f).verticalScroll(rememberScrollState()),
-                      verticalArrangement = Arrangement.spacedBy(7.dp)) {
-                      routines[d]!!.forEachIndexed { i, ex ->'''
-          if s.count(old) != 1:
-              raise SystemExit("Lista PESI non trovata una sola volta: patch annullata")
-          s = s.replace(old, new, 1)
-          p.write_text(s, encoding="utf-8")
-          print("Schermata PESI: lista esercizi convertita in scorrimento verticale stabile.")
           PY
 
       - name: Replace PESI with exercise guide library
