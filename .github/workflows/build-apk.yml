@@ -863,7 +863,7 @@ jobs:
               anchor = "import androidx.compose.foundation.clickable"
               if s.count(anchor) != 1:
                   raise SystemExit("Foundation import anchor not found")
-              s = s.replace(anchor, anchor + "\\nimport androidx.compose.foundation.verticalScroll\\nimport androidx.compose.foundation.rememberScrollState", 1)
+              s = s.replace(anchor, anchor + chr(10) + "import androidx.compose.foundation.verticalScroll" + chr(10) + "import androidx.compose.foundation.rememberScrollState", 1)
           start_token = "                when (tab) {"
           end_token = "                Spacer(Modifier.weight(1f))"
           start = s.find(start_token)
@@ -871,8 +871,8 @@ jobs:
           if start < 0 or end < 0:
               raise SystemExit("Could not locate screen navigation block for scrolling")
           block = s[start:end].rstrip()
-          indented = "\\n".join(("    " + line) if line else line for line in block.splitlines())
-          wrapped = "                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {\\n" + indented + "\\n                }\\n"
+          indented = chr(10).join(("    " + line) if line else line for line in block.splitlines())
+          wrapped = "                Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())) {" + chr(10) + indented + chr(10) + "                }" + chr(10)
           s = s[:start] + wrapped + s[end:]
 
           profile_route = '                    "PROFILE" -> Column(Modifier.fillMaxWidth().background(Panel).padding(18.dp)) {\n                        Text("PROFILO", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)\n                        Text("ACCOUNT COLLEGATO", color = Red, fontSize = 10.sp)\n                        Text(com.google.firebase.auth.FirebaseAuth.getInstance().currentUser?.email ?: "Account", color = White, fontSize = 15.sp)\n                        TextButton(onClick = { tab = "HOME" }) { Text("TORNA ALL\'ALLENAMENTO", color = Red) }\n                    }\n'
