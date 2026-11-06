@@ -396,6 +396,22 @@ jobs:
           print("Added direct manual kg entry with decimals for each individual set")
           PY
 
+      - name: Fix workout set list inside scrolling screen
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+          old = '        LazyColumn(Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(7.dp)) {\n            itemsIndexed((0 until ex.sets).toList()) { s, _ ->'
+          new = '        Column(verticalArrangement = Arrangement.spacedBy(7.dp)) {\n            (0 until ex.sets).forEach { s ->'
+          if s.count(old) != 1:
+              raise SystemExit("Elenco serie non individuato esattamente una volta: nessuna modifica applicata")
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding="utf-8")
+          print("Elenco serie convertito in Column: tutte le righe sono misurate correttamente nel contenitore verticale scorrevole.")
+          PY
+
       - name: Add PESI screen
         run: |
           python3 - <<'PY'
