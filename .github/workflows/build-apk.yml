@@ -1280,7 +1280,7 @@ jobs:
           s = p.read_text(encoding="utf-8")
           old = ".verticalScroll(rememberScrollState())"
           new = """.then(
-                      if (tab in listOf("WORKOUT", "STORICO")) Modifier
+                      if (tab in listOf("WORKOUT", "STORICO", "ESERCIZI")) Modifier
                       else Modifier.verticalScroll(rememberScrollState())
                   )"""
           if s.count(old) != 1:
@@ -1471,6 +1471,39 @@ jobs:
               s += "\n\n" + guide
           p.write_text(s, encoding="utf-8")
           print("Sezione PESI sostituita con ESERCIZI AI: schede A/B/C, ricerca e guide per esercizio.")
+          PY
+
+      - name: Give exercise library its own vertical scroll area
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+          start = s.find("private fun ExerciseGuideScreen(")
+          if start < 0:
+              raise SystemExit("ExerciseGuideScreen non trovata")
+          brace = s.find("{", start)
+          depth = 0
+          end = None
+          for i in range(brace, len(s)):
+              if s[i] == "{": depth += 1
+              elif s[i] == "}":
+                  depth -= 1
+                  if depth == 0:
+                      end = i + 1
+                      break
+          if end is None:
+              raise SystemExit("ExerciseGuideScreen non chiusa")
+          block = s[start:end]
+          old = "Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(12.dp))"
+          new = "Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp))"
+          if block.count(old) != 1:
+              raise SystemExit("Contenitore ESERCIZI non individuato una sola volta: modifica annullata")
+          block = block.replace(old, new, 1)
+          s = s[:start] + block + s[end:]
+          p.write_text(s, encoding="utf-8")
+          print("ESERCIZI ora ha uno scroll verticale indipendente; nessuna modifica alla navigazione A/B/C.")
           PY
 
       - name: Fix vertical scrolling and add visible exercise illustrations
