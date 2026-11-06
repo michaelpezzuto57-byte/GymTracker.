@@ -1551,6 +1551,106 @@ jobs:
           print("Swipe laterale rimosso; miniature illustrate visibili aggiunte alle schede esercizio.")
           PY
 
+      - name: Fix page swipe and set 60-second recovery
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          root = Path(os.environ["PROJECT_DIR"])
+          source = root / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = source.read_text(encoding="utf-8")
+
+          # Disable swipe navigation on any Compose HorizontalPager.
+          pager_count = s.count("HorizontalPager(")
+          if pager_count:
+              out = []
+              pos = 0
+              while True:
+                  start = s.find("HorizontalPager(", pos)
+                  if start < 0:
+                      out.append(s[pos:])
+                      break
+                  out.append(s[pos:start])
+                  open_paren = s.find("(", start)
+                  depth = 0
+                  end = None
+                  for i in range(open_paren, len(s)):
+                      if s[i] == "(":
+                          depth += 1
+                      elif s[i] == ")":
+                          depth -= 1
+                          if depth == 0:
+                              end = i
+                              break
+                  if end is None:
+                      raise SystemExit("HorizontalPager non chiuso")
+                  args = s[open_paren + 1:end]
+                  if "userScrollEnabled" not in args:
+                      args = args.rstrip() + ", userScrollEnabled = false"
+                  out.append("HorizontalPager(" + args + ")")
+                  pos = end + 1
+              s = "".join(out)
+
+          # Remove custom horizontal drag handlers that can steal vertical drags.
+          while True:
+              token = "pointerInput("
+              start = s.find(token)
+              found = None
+              while start >= 0:
+                  paren = s.find("(", start)
+                  depth = 0
+                  close_paren = None
+                  for i in range(paren, len(s)):
+                      if s[i] == "(":
+                          depth += 1
+                      elif s[i] == ")":
+                          depth -= 1
+                          if depth == 0:
+                              close_paren = i
+                              break
+                  if close_paren is None:
+                      raise SystemExit("pointerInput non chiuso")
+                  brace = s.find("{", close_paren)
+                  if brace < 0:
+                      start = s.find(token, start + len(token))
+                      continue
+                  depth = 0
+                  close_brace = None
+                  for i in range(brace, len(s)):
+                      if s[i] == "{":
+                          depth += 1
+                      elif s[i] == "}":
+                          depth -= 1
+                          if depth == 0:
+                              close_brace = i
+                              break
+                  if close_brace is None:
+                      raise SystemExit("Blocco pointerInput non chiuso")
+                  if "detectHorizontalDragGestures" in s[brace:close_brace]:
+                      dot = s.rfind(".", max(0, start - 2), start)
+                      found = (dot if dot >= 0 else start, close_brace + 1)
+                      break
+                  start = s.find(token, close_paren + 1)
+              if found is None:
+                  break
+              s = s[:found[0]] + s[found[1]:]
+
+          # Change every timer entry point and dashboard label to 60 seconds.
+          s = s.replace("90_000L", "60_000L")
+          s = s.replace("seconds = 90", "seconds = 60")
+          s = s.replace("EXTRA_LENGTH, 90", "EXTRA_LENGTH, 60")
+          s = s.replace('"90s"', '"60s"')
+          source.write_text(s, encoding="utf-8")
+
+          service = root / "app/src/main/java/it/gymtracker/app/RestTimerService.kt"
+          if service.exists():
+              t = service.read_text(encoding="utf-8")
+              t = t.replace("90 secondi", "60 secondi").replace("90-second", "60-second")
+              service.write_text(t, encoding="utf-8")
+
+          print(f"Swipe orizzontale disattivato nei pager ({pager_count} trovati); recupero impostato a 60 secondi.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
