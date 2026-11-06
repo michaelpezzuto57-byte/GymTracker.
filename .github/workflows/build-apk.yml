@@ -834,9 +834,9 @@ jobs:
       - name: Diagnose menu source before patch
         run: |
           python3 - <<'PY'
+          import os
           from pathlib import Path
           p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
-          import os
           lines = p.read_text(encoding="utf-8").splitlines()
           keys = ("drawerOpen", '"PESI"', '"STORICO"', "WeightsScreen", "var tab by remember")
           hits = [i for i, line in enumerate(lines) if any(k in line for k in keys)]
