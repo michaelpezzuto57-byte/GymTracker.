@@ -1095,15 +1095,15 @@ jobs:
               if imp not in s:
                   anchor = "import androidx.compose.foundation.layout.*"
                   if anchor in s:
-                      s = s.replace(anchor, anchor + "\\n" + imp, 1)
+                      s = s.replace(anchor, anchor + "\n" + imp, 1)
                   else:
                       raise SystemExit("Import layout Compose non trovato: impossibile attivare lo scroll")
 
           # Find Header with brace matching, regardless of whether an earlier patch
           # already changed its signature.
-          match = re.search(r"private fun Header\\s*\\([^)]*\\)\\s*\\{", s)
+          match = re.search(r"private fun Header\s*\([^)]*\)\s*\{", s)
           if not match:
-              match = re.search(r"private fun Header\\s*\\(\\s*\\)\\s*\\{", s)
+              match = re.search(r"private fun Header\s*\(\s*\)\s*\{", s)
           if not match:
               raise SystemExit("Funzione Header non trovata nel sorgente")
           start = match.start()
@@ -1120,15 +1120,15 @@ jobs:
           if end is None:
               raise SystemExit("Blocco Header non chiuso")
           header = s[start:end]
-          header = re.sub(r"private fun Header\\s*\\([^)]*\\)", "private fun Header(onMenuClick: () -> Unit)", header, count=1)
+          header = re.sub(r"private fun Header\s*\([^)]*\)", "private fun Header(onMenuClick: () -> Unit)", header, count=1)
           # Remove old model/vehicle branding from the header.
-          header = re.sub(r'^\\s*Text\\("(?:RS4|125)"[^\\n]*\\)\\s*\\n?', "", header, flags=re.M)
+          header = re.sub(r'^\s*Text\("(?:RS4|125)"[^\n]*\)\s*\n?', "", header, flags=re.M)
           if "onClick = onMenuClick" not in header:
               anchor = "Column(Modifier.weight(1f)) {"
               if header.count(anchor) != 1:
                   raise SystemExit("Colonna logo Header non individuata in modo univoco")
               header = header.replace(anchor,
-                  'TextButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) { Text("☰", color = Red, fontSize = 27.sp) }\\n        Spacer(Modifier.width(8.dp))\\n        ' + anchor, 1)
+                  'TextButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) { Text("☰", color = Red, fontSize = 27.sp) }\n        Spacer(Modifier.width(8.dp))\n        ' + anchor, 1)
           s = s[:start] + header + s[end:]
 
           # Keep the header and bottom navigation outside the scroll container.
