@@ -1660,7 +1660,7 @@ jobs:
           import os
           p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
           s = p.read_text(encoding="utf-8")
-          marker = "@Composable\\nprivate fun ExerciseThumbnail("
+          marker = "@Composable\nprivate fun ExerciseThumbnail("
           start = s.find(marker)
           if start < 0:
               raise SystemExit("ExerciseThumbnail non trovato")
