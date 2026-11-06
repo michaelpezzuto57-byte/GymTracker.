@@ -853,10 +853,18 @@ jobs:
 
           if 'private fun Header(onMenuClick: () -> Unit)' not in s:
               s = s.replace("private fun Header() {", "private fun Header(onMenuClick: () -> Unit) {", 1)
+              header_start = s.find("private fun Header(onMenuClick: () -> Unit)")
+              header_end = s.find("\\n@Composable", header_start)
+              if header_start < 0 or header_end < 0:
+                  raise SystemExit("Header function boundaries not found")
+              header = s[header_start:header_end]
               anchor = '        Column(Modifier.weight(1f)) {'
-              if s.count(anchor) != 1:
-                  raise SystemExit("Header left-side anchor not found uniquely")
-              s = s.replace(anchor, '        TextButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) { Text("☰", color = Red, fontSize = 27.sp) }\n        Spacer(Modifier.width(8.dp))\n' + anchor, 1)
+              if header.count(anchor) != 1:
+                  raise SystemExit("Header logo column not found uniquely")
+              header = header.replace(anchor, '        TextButton(onClick = onMenuClick, modifier = Modifier.size(44.dp)) { Text("☰", color = Red, fontSize = 27.sp) }\\n        Spacer(Modifier.width(8.dp))\\n' + anchor, 1)
+              header = header.replace('        Text("RS4", color = Color(0xFF777777), fontSize = 32.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)\\n', '')
+              header = header.replace('        Text("125", color = Red, fontSize = 13.sp, fontWeight = FontWeight.Black, modifier = Modifier.align(Alignment.Bottom))\\n', '')
+              s = s[:header_start] + header + s[header_end:]
 
           # Make the selected screen content vertically scrollable with a finger.
           if "import androidx.compose.foundation.verticalScroll" not in s:
@@ -890,7 +898,7 @@ jobs:
                       ) {
                           Text("MENU PRINCIPALE", color = Red, fontSize = 18.sp, fontWeight = FontWeight.Black)
                           Spacer(Modifier.height(18.dp))
-                          listOf("ALLENAMENTO" to "HOME", "PESI" to "PESI", "STORICO" to "STORICO", "PROFILO" to "PROFILE").forEach { (label, destination) ->
+                          listOf("ALLENAMENTO" to "HOME", "PESI" to "PESI", "STORICO" to "STORICO", "STATISTICHE" to "STATISTICHE", "CALENDARIO" to "CALENDARIO", "RECORD PERSONALI" to "RECORD", "PROFILO" to "PROFILE").forEach { (label, destination) ->
                               TextButton(onClick = { tab = destination; drawerOpen = false }, modifier = Modifier.fillMaxWidth()) {
                                   Text(label, color = White, fontWeight = FontWeight.Bold)
                               }
