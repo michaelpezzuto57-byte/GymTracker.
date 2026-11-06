@@ -1321,6 +1321,120 @@ jobs:
           print("Schermata PESI: lista esercizi convertita in scorrimento verticale stabile.")
           PY
 
+      - name: Replace PESI with exercise guide library
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+
+          old_route = '                    "PESI" -> WeightsScreen(day, prefs)'
+          new_route = '                    "ESERCIZI" -> ExerciseGuideScreen(day)'
+          if s.count(old_route) != 1:
+              raise SystemExit("Route PESI non trovata una sola volta: nessuna modifica applicata")
+          s = s.replace(old_route, new_route, 1)
+
+          old_bottom = '"WORKOUT" to "ALLENAMENTO", "PESI" to "PESI", "STORICO" to "STORICO"'
+          new_bottom = '"WORKOUT" to "ALLENAMENTO", "ESERCIZI" to "ESERCIZI", "STORICO" to "STORICO"'
+          if s.count(old_bottom) != 1:
+              raise SystemExit("Voce PESI nel menu inferiore non trovata")
+          s = s.replace(old_bottom, new_bottom, 1)
+
+          old_drawer = '"PESI" to "PESI"'
+          if s.count(old_drawer) != 1:
+              raise SystemExit("Voce PESI nel menu laterale non trovata")
+          s = s.replace(old_drawer, '"ESERCIZI AI" to "ESERCIZI"', 1)
+
+          s = s.replace('"HOME", "PESI", "STORICO"', '"HOME", "ESERCIZI", "STORICO"')
+          s = s.replace('"WORKOUT", "STORICO", "PESI"', '"WORKOUT", "STORICO", "ESERCIZI"')
+
+          guide = r"""
+          @Composable
+          private fun ExerciseGuideScreen(initialDay: String) {
+              var selectedDay by remember { mutableStateOf(initialDay) }
+              var search by remember { mutableStateOf("") }
+              var selectedExercise by remember { mutableStateOf<Exercise?>(null) }
+              val exerciseList = routines[selectedDay].orEmpty()
+                  .filter { it.name.replace("*", "").contains(search, ignoreCase = true) }
+
+              Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                  Text("ESERCIZI AI", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                  Text("GUIDE VISIVE DELLA TUA SCHEDA", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                  Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                      listOf("A", "B", "C").forEach { d ->
+                          Button(
+                              onClick = { selectedDay = d; selectedExercise = null },
+                              modifier = Modifier.weight(1f),
+                              colors = ButtonDefaults.buttonColors(containerColor = if (selectedDay == d) Red else Panel2)
+                          ) { Text("GIORNO $d", color = White, fontSize = 10.sp) }
+                      }
+                  }
+                  OutlinedTextField(
+                      value = search,
+                      onValueChange = { search = it },
+                      modifier = Modifier.fillMaxWidth(),
+                      singleLine = true,
+                      label = { Text("Cerca un esercizio", color = Muted) },
+                      colors = androidx.compose.material3.OutlinedTextFieldDefaults.colors(
+                          focusedTextColor = White, unfocusedTextColor = White,
+                          focusedBorderColor = Red, unfocusedBorderColor = RedDark,
+                          focusedLabelColor = Red, unfocusedLabelColor = Muted,
+                          cursorColor = Red
+                      )
+                  )
+                  if (selectedExercise == null) {
+                      Text("SCEGLI UN ESERCIZIO", color = White, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                      exerciseList.forEach { ex ->
+                          Row(
+                              Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp))
+                                  .background(Panel).border(1.dp, RedDark, RoundedCornerShape(12.dp))
+                                  .clickable { selectedExercise = ex }.padding(14.dp),
+                              verticalAlignment = Alignment.CenterVertically
+                          ) {
+                              Column(Modifier.weight(1f)) {
+                                  Text(ex.name.replace("*", ""), color = White, fontWeight = FontWeight.Black)
+                                  Text("${ex.sets} SERIE • ${ex.reps} RIP.", color = Muted, fontSize = 10.sp)
+                              }
+                              Text("VEDI GUIDA  ›", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                          }
+                      }
+                      if (exerciseList.isEmpty()) Text("Nessun esercizio trovato.", color = Muted)
+                  } else {
+                      val ex = selectedExercise!!
+                      TextButton(onClick = { selectedExercise = null }) { Text("‹ TORNA AGLI ESERCIZI", color = Red) }
+                      Text(ex.name.replace("*", ""), color = White, fontSize = 20.sp, fontWeight = FontWeight.Black)
+                      Box(
+                          Modifier.fillMaxWidth().height(170.dp).clip(RoundedCornerShape(16.dp))
+                              .background(Color(0xFF171717)).border(1.dp, RedDark, RoundedCornerShape(16.dp)),
+                          contentAlignment = Alignment.Center
+                      ) {
+                          Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                              Text("🏋️", fontSize = 54.sp)
+                              Text("ILLUSTRAZIONE DEL MOVIMENTO", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                              Text("Guida dell'esercizio selezionato", color = Muted, fontSize = 10.sp)
+                          }
+                      }
+                      Text("COME ESEGUIRLO", color = Red, fontWeight = FontWeight.Black, fontSize = 12.sp)
+                      listOf(
+                          "1. Posizionati e prepara l'attrezzatura in modo stabile.",
+                          "2. Esegui il movimento lentamente, senza slanci e mantenendo il controllo.",
+                          "3. Torna alla posizione iniziale in modo controllato."
+                      ).forEach { instruction ->
+                          Text(instruction, color = White, fontSize = 12.sp,
+                              modifier = Modifier.fillMaxWidth().background(Panel).padding(12.dp))
+                      }
+                      Text("Consiglio: usa un carico gestibile e interrompi la serie se senti dolore.", color = Muted, fontSize = 11.sp)
+                  }
+              }
+          }
+          """
+          if "private fun ExerciseGuideScreen(" not in s:
+              s += "\n\n" + guide
+          p.write_text(s, encoding="utf-8")
+          print("Sezione PESI sostituita con ESERCIZI AI: schede A/B/C, ricerca e guide per esercizio.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
