@@ -1290,16 +1290,16 @@ jobs:
           import os
           p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
           s = p.read_text(encoding="utf-8")
-          old = "Column(Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState()))"
-          new = """Column(Modifier.weight(1f).fillMaxWidth().then(
+          old = ".verticalScroll(rememberScrollState())"
+          new = """.then(
                       if (tab in listOf("WORKOUT", "STORICO", "PESI")) Modifier
                       else Modifier.verticalScroll(rememberScrollState())
-                  ))"""
+                  )"""
           if s.count(old) != 1:
-              raise SystemExit("Contenitore principale non trovato una sola volta: patch annullata")
+              raise SystemExit("Modificatore di scorrimento non trovato una sola volta: patch annullata")
           s = s.replace(old, new, 1)
           p.write_text(s, encoding="utf-8")
-          print("Corretto lo scroll: le schermate con LazyColumn gestiscono il proprio scorrimento senza scroll verticale annidato.")
+          print("Scroll annidato disattivato in Allenamento, Pesi e Storico; scroll generale mantenuto nelle altre schermate.")
           PY
 
       - name: Build APK
