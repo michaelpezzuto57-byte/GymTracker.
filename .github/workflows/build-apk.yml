@@ -2175,6 +2175,7 @@ jobs:
 
           @Composable
           internal fun ProfileScreen(history:String,prefs:android.content.SharedPreferences,onSignOut:()->Unit) {
+              var selectedSettings by remember { mutableStateOf<String?>(null) }
               val user=FirebaseAuth.getInstance().currentUser
               val sessions=history.lines().filter{it.isNotBlank()}
               val sets=sessions.sumOf{Regex("(\\d+)/(\\d+) serie").find(it)?.groupValues?.get(1)?.toIntOrNull()?:0}
@@ -2222,17 +2223,82 @@ jobs:
                       Text("Il grafico dettagliato sarà mostrato quando saranno disponibili dati storici sufficienti.",color=PM,fontSize=9.sp)
                   }
                   Panel("IMPOSTAZIONI PERSONALI"){
-                      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Setting(Modifier.weight(1f),"🔔","NOTIFICHE");Setting(Modifier.weight(1f),"🎨","ASPETTO APP");Setting(Modifier.weight(1f),"⏱","TIMER E SUONI");Setting(Modifier.weight(1f),"👤","ACCOUNT")}
+                      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Setting(Modifier.weight(1f),"🔔","NOTIFICHE"){selectedSettings="NOTIFICHE"};Setting(Modifier.weight(1f),"🎨","ASPETTO APP"){selectedSettings="ASPETTO APP"};Setting(Modifier.weight(1f),"⏱","TIMER E SUONI"){selectedSettings="TIMER E SUONI"};Setting(Modifier.weight(1f),"👤","ACCOUNT"){selectedSettings="ACCOUNT"}}
                   }
                   Button(onClick=onSignOut,modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF790914)),shape=RoundedCornerShape(10.dp)){Text("ESCI DALL'ACCOUNT",color=PW,fontWeight=FontWeight.Black)}
               }
+              ProfileSettingsDialog(selectedSettings,prefs){ selectedSettings=null }
           }
           @Composable private fun Panel(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(PP).border(1.dp,Color(0xFF68101A),RoundedCornerShape(14.dp)).padding(11.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){Text(title,color=PR,fontSize=11.sp,fontWeight=FontWeight.Black);content()}}
           @Composable private fun Metric(icon:String,value:String,label:String){Column(horizontalAlignment=Alignment.CenterHorizontally){Text(icon,fontSize=17.sp);Text(value,color=PW,fontSize=16.sp,fontWeight=FontWeight.Black);Text(label,color=PM,fontSize=7.sp,textAlign=TextAlign.Center)}}
-          @Composable private fun Setting(modifier:Modifier,icon:String,label:String){Column(modifier.background(Color(0xFF09090A),RoundedCornerShape(8.dp)).padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally){Text(icon,fontSize=17.sp);Text(label,color=PW,fontSize=7.sp,textAlign=TextAlign.Center)}}
+          @Composable private fun Setting(modifier:Modifier,icon:String,label:String,onClick:()->Unit){Column(modifier.clip(RoundedCornerShape(8.dp)).background(Color(0xFF09090A)).clickable(onClick=onClick).padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally){Text(icon,fontSize=17.sp);Text(label,color=PW,fontSize=7.sp,textAlign=TextAlign.Center)}}
+          '''
+          code += r'''
+          @Composable
+          private fun ProfileSettingsDialog(page:String?,prefs:android.content.SharedPreferences,onClose:()->Unit) {
+              if(page==null) return
+              var workoutReminder by remember(page) { mutableStateOf(prefs.getBoolean("profile_notify_workout",false)) }
+              var restNotice by remember(page) { mutableStateOf(prefs.getBoolean("profile_notify_rest",true)) }
+              var dailyReminder by remember(page) { mutableStateOf(prefs.getBoolean("profile_notify_daily",false)) }
+              var sound by remember(page) { mutableStateOf(prefs.getBoolean("profile_timer_sound",true)) }
+              var vibration by remember(page) { mutableStateOf(prefs.getBoolean("profile_timer_vibration",true)) }
+              var effects by remember(page) { mutableStateOf(prefs.getBoolean("profile_red_effects",true)) }
+              var duration by remember(page) { mutableIntStateOf(prefs.getInt("rest_duration_seconds",60)) }
+              AlertDialog(onDismissRequest=onClose,
+                  title={Text(page,color=PR,fontWeight=FontWeight.Black)},
+                  text={
+                      Column(verticalArrangement=Arrangement.spacedBy(10.dp)) {
+                          when(page) {
+                              "NOTIFICHE" -> {
+                                  PrefSwitch("Promemoria allenamento",workoutReminder){workoutReminder=it;prefs.edit().putBoolean("profile_notify_workout",it).apply()}
+                                  PrefSwitch("Avviso fine recupero",restNotice){restNotice=it;prefs.edit().putBoolean("profile_notify_rest",it).apply()}
+                                  PrefSwitch("Promemoria giornaliero",dailyReminder){dailyReminder=it;prefs.edit().putBoolean("profile_notify_daily",it).apply()}
+                                  Text("I promemoria programmati verranno collegati alla pianificazione notifiche in un aggiornamento successivo.",color=PM,fontSize=10.sp)
+                              }
+                              "ASPETTO APP" -> {
+                                  PrefSwitch("Effetti rossi",effects){effects=it;prefs.edit().putBoolean("profile_red_effects",it).apply()}
+                                  Text("Tema attivo: RACING (nero e rosso). Il tema principale resta invariato.",color=PM,fontSize=11.sp)
+                              }
+                              "TIMER E SUONI" -> {
+                                  Text("DURATA RECUPERO",color=PR,fontWeight=FontWeight.Bold,fontSize=11.sp)
+                                  Row(horizontalArrangement=Arrangement.spacedBy(5.dp)) {
+                                      listOf(30,45,60,90,120).forEach { seconds ->
+                                          TextButton(onClick={duration=seconds;prefs.edit().putInt("rest_duration_seconds",seconds).apply()}) {
+                                              Text(if(duration==seconds) "[$seconds]" else "$seconds",color=if(duration==seconds) PR else PW,fontSize=10.sp)
+                                          }
+                                      }
+                                  }
+                                  PrefSwitch("Suono a fine recupero",sound){sound=it;prefs.edit().putBoolean("profile_timer_sound",it).apply()}
+                                  PrefSwitch("Vibrazione",vibration){vibration=it;prefs.edit().putBoolean("profile_timer_vibration",it).apply()}
+                                  Text("Durata salvata: $duration secondi.",color=PM,fontSize=10.sp)
+                              }
+                              "ACCOUNT" -> {
+                                  val user=FirebaseAuth.getInstance().currentUser
+                                  Text("EMAIL",color=PR,fontWeight=FontWeight.Bold,fontSize=10.sp)
+                                  Text(user?.email ?: "Account non disponibile",color=PW,fontSize=12.sp)
+                                  Text("ACCESSO",color=PR,fontWeight=FontWeight.Bold,fontSize=10.sp)
+                                  Text(user?.providerData?.map{it.providerId}?.filter{it!="firebase"}?.distinct()?.joinToString() ?: "—",color=PW,fontSize=12.sp)
+                                  Text("I dati dell'account e la sincronizzazione Firebase non vengono modificati da queste impostazioni.",color=PM,fontSize=10.sp)
+                              }
+                          }
+                      }
+                  },
+                  confirmButton={TextButton(onClick=onClose){Text("CHIUDI",color=PR,fontWeight=FontWeight.Bold)}},
+                  containerColor=PP,
+                  titleContentColor=PW,
+                  textContentColor=PW
+              )
+          }
+          @Composable
+          private fun PrefSwitch(label:String,checked:Boolean,onChange:(Boolean)->Unit) {
+              Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween,verticalAlignment=Alignment.CenterVertically) {
+                  Text(label,color=PW,fontSize=11.sp,modifier=Modifier.weight(1f))
+                  Switch(checked=checked,onCheckedChange=onChange)
+              }
+          }
           '''
           (pkg/"ProfileScreen.kt").write_text(code,encoding="utf-8")
-          print("Profilo Racing e trofei retroattivi inseriti.")
+          print("Profilo Racing e impostazioni personali interattive inseriti.")
           PY
 
       - name: Build APK
