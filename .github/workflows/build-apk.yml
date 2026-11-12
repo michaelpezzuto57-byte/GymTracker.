@@ -2124,6 +2124,10 @@ jobs:
           }
           '''
           (pkg / "SchedeScreen.kt").write_text(schede, encoding="utf-8")
+          print("=== MAINACTIVITY FINALE 160-215 ===")
+          for number, line in enumerate(s.splitlines(), 1):
+              if 160 <= number <= 215:
+                  print(f"{number}: {line}")
           main.write_text(s, encoding="utf-8")
           print("Sezione SCHEDE con importazione foto OCR, modifica manuale, archivio e attivazione integrata.")
           PY
