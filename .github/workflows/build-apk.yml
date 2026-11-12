@@ -1741,6 +1741,80 @@ jobs:
           print("Miniature illustrate visibili aggiunte alle schede esercizio.")
           PY
 
+      - name: Install realistic exercise photo assets
+        run: |
+          set -euo pipefail
+          APP_DIR="$PROJECT_DIR/app"
+          DRAWABLE_DIR="$APP_DIR/src/main/res/drawable-nodpi"
+          mkdir -p "$DRAWABLE_DIR"
+          unzip -o GymTracker_27_Exercise_Images.zip 'gym_exercise_images/*.jpg' -d "$RUNNER_TEMP/gymtracker_photos"
+          cp "$RUNNER_TEMP"/gymtracker_photos/gym_exercise_images/*.jpg "$DRAWABLE_DIR"/
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+          start = s.find("@Composable\nprivate fun ExerciseThumbnail(")
+          if start < 0:
+              raise SystemExit("ExerciseThumbnail non trovato: build interrotta per evitare foto non collegate")
+          brace = s.find("{", start)
+          depth = 0
+          end = None
+          for i in range(brace, len(s)):
+              if s[i] == "{": depth += 1
+              elif s[i] == "}":
+                  depth -= 1
+                  if depth == 0:
+                      end = i + 1
+                      break
+          if end is None:
+              raise SystemExit("ExerciseThumbnail non chiuso")
+          replacement = r"""@Composable
+          private fun ExerciseThumbnail(name: String, modifier: Modifier = Modifier) {
+              val n = name.lowercase().replace("*", "").trim()
+              val imageId = when {
+                  "leg press" in n || "pressa" in n -> R.drawable.exercise_01
+                  "panca piana" in n -> R.drawable.exercise_02
+                  "lat machine" in n || "lat" in n -> R.drawable.exercise_03
+                  "alzate laterali" in n -> R.drawable.exercise_10
+                  "scott" in n -> R.drawable.exercise_11
+                  "push down" in n || "pushdown" in n -> R.drawable.exercise_12
+                  "crunch inverso" in n -> R.drawable.exercise_26
+                  "crunch" in n -> R.drawable.exercise_19
+                  "plank" in n && "side" !in n -> R.drawable.exercise_21
+                  "lento" in n -> R.drawable.exercise_04
+                  "pulley" in n -> R.drawable.exercise_08
+                  "leg extension" in n -> R.drawable.exercise_06
+                  "croci" in n -> R.drawable.exercise_07
+                  "posteriori" in n -> R.drawable.exercise_13
+                  "curl" in n && ("cavo" in n || "cable" in n) -> R.drawable.exercise_15
+                  "ab crunch" in n -> R.drawable.exercise_19
+                  "side plank" in n -> R.drawable.exercise_23
+                  "vertical" in n || "inversi" in n -> R.drawable.exercise_24
+                  "chest press" in n -> R.drawable.exercise_04
+                  "rematore" in n -> R.drawable.exercise_14
+                  "leg curl" in n -> R.drawable.exercise_18
+                  "push up" in n || "push-up" in n -> R.drawable.exercise_16
+                  "curl" in n && "manubri" in n -> R.drawable.exercise_17
+                  "french" in n || "francese" in n -> R.drawable.exercise_22
+                  "gambe su" in n -> R.drawable.exercise_25
+                  "hpx" in n || "hyper" in n -> R.drawable.exercise_27
+                  else -> R.drawable.exercise_01
+              }
+              androidx.compose.foundation.Image(
+                  painter = androidx.compose.ui.res.painterResource(imageId),
+                  contentDescription = "Dimostrazione: $name",
+                  contentScale = androidx.compose.ui.layout.ContentScale.Crop,
+                  modifier = modifier
+              )
+          }"""
+          s = s[:start] + replacement + s[end:]
+          p.write_text(s, encoding="utf-8")
+          print("Miniature collegate alle 27 foto locali; fallback attivo solo per nomi non riconosciuti.")
+          PY
+          test "$(find "$DRAWABLE_DIR" -maxdepth 1 -name 'exercise_*.jpg' | wc -l)" -eq 27
+          echo "Installate 27 foto esercizi in drawable-nodpi."
+          
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
