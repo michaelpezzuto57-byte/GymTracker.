@@ -951,7 +951,7 @@ jobs:
           p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
           s = p.read_text(encoding="utf-8")
 
-          route_anchor = '                    "PESI" -> WeightsScreen(day, prefs)'
+          route_anchor = '                    "RESULT" -> ResultScreen('
           routes = '''                    "STATISTICHE" -> StatsScreen(history)
                               "CALENDARIO" -> CalendarScreen(prefs)
                               "RECORD" -> RecordsScreen(prefs)'''
