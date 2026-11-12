@@ -1936,7 +1936,7 @@ jobs:
                   raise SystemExit("Voce ALLENAMENTO del menu laterale non trovata in modo univoco")
               s = s.replace(menu_anchor, menu_anchor + ', "SCHEDE" to "SCHEDE"', 1)
 
-          route_anchor = '                    "PESI" -> WeightsScreen(day, prefs)'
+          route_anchor = '                    "ESERCIZI" -> ExerciseGuideScreen(day)'
           if '"SCHEDE" -> SchedeScreen' not in s:
               route = '''                    "SCHEDE" -> SchedeScreen(context, prefs) { updated ->
                                       routines = updated
@@ -1947,7 +1947,7 @@ jobs:
                                   }
           '''
               if s.count(route_anchor) != 1:
-                  raise SystemExit("Punto di inserimento schermata SCHEDE non trovato")
+                  raise SystemExit("Route ESERCIZI non trovata in modo univoco per inserire SCHEDE")
               s = s.replace(route_anchor, route + route_anchor, 1)
 
           schede = r'''package it.gymtracker.app
