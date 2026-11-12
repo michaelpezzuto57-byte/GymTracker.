@@ -1780,20 +1780,20 @@ jobs:
                   "alzate laterali" in n -> R.drawable.exercise_10
                   "scott" in n -> R.drawable.exercise_11
                   "push down" in n || "pushdown" in n -> R.drawable.exercise_12
-                  "crunch inverso" in n -> R.drawable.exercise_26
-                  "crunch gambe su" in n || ("crunch" in n && "gambe su" in n) -> R.drawable.exercise_25
+                  "crunch inverso" in n -> R.drawable.exercise_25
+                  "crunch gambe su" in n || ("crunch" in n && "gambe su" in n) -> R.drawable.exercise_26
                   "crunch" in n -> R.drawable.exercise_19
                   "plank" in n && "side" !in n -> R.drawable.exercise_21
                   "lento" in n -> R.drawable.exercise_04
                   "pulley" in n -> R.drawable.exercise_08
                   "leg extension" in n -> R.drawable.exercise_06
                   "croci" in n -> R.drawable.exercise_07
-                  "posteriori" in n -> R.drawable.exercise_13
+                  "posteriori" in n -> R.drawable.exercise_14
                   "curl" in n && ("cavo" in n || "cable" in n) -> R.drawable.exercise_15
                   "ab crunch" in n -> R.drawable.exercise_19
                   "side plank" in n -> R.drawable.exercise_23
                   "vertical" in n || "inversi" in n -> R.drawable.exercise_24
-                  "chest press" in n -> R.drawable.exercise_02
+                  "chest press" in n -> R.drawable.exercise_09
                   "rematore" in n -> R.drawable.exercise_14
                   "leg curl" in n -> R.drawable.exercise_18
                   "push up" in n || "push-up" in n -> R.drawable.exercise_16
