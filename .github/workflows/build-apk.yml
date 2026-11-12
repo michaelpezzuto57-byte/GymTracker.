@@ -1891,6 +1891,243 @@ jobs:
           print("Guida esercizi corretta: foto reale e interpolazione dei testi ripristinata.")
           PY
 
+      - name: Add Schede manager with photo OCR
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          root = Path(os.environ["PROJECT_DIR"])
+          app_gradle = root / "app/build.gradle.kts"
+          gradle = app_gradle.read_text()
+          dependency = 'implementation("com.google.mlkit:text-recognition:16.0.1")'
+          if dependency not in gradle:
+              if gradle.count("dependencies {") != 1:
+                  raise SystemExit("Blocco dependencies non trovato per OCR")
+              gradle = gradle.replace("dependencies {", "dependencies {\n    " + dependency, 1)
+              app_gradle.write_text(gradle)
+
+          pkg = root / "app/src/main/java/it/gymtracker/app"
+          main = pkg / "MainActivity.kt"
+          s = main.read_text(encoding="utf-8")
+          if "private var routines by mutableStateOf" not in s:
+              if s.count("private val routines = mapOf(") != 1:
+                  raise SystemExit("Routine predefinite non trovate")
+              s = s.replace("private val routines = mapOf(", "private var routines by mutableStateOf(mapOf(", 1)
+              if s.count("\n)\nprivate data class Exercise") != 1:
+                  raise SystemExit("Fine della mappa routine non individuata")
+              s = s.replace("\n)\nprivate data class Exercise", "\n))\ninternal data class Exercise", 1)
+
+          prefs_line = '    val prefs = remember { context.getSharedPreferences("gym_tracker", Context.MODE_PRIVATE) }\n'
+          if "prefs.getString(\"active_routine_json\"" not in s:
+              load_code = '''    LaunchedEffect(Unit) {
+                  prefs.getString("active_routine_json", null)?.takeIf { it.isNotBlank() }?.let { saved ->
+                      runCatching { routines = decodeRoutineJson(saved) }
+                  }
+              }
+          '''
+              if s.count(prefs_line) != 1:
+                  raise SystemExit("SharedPreferences iniziali non trovate")
+              s = s.replace(prefs_line, prefs_line + load_code, 1)
+
+          menu_anchor = '"ALLENAMENTO" to "HOME", "PESI" to "PESI"'
+          if '"SCHEDE" to "SCHEDE"' not in s:
+              if s.count(menu_anchor) != 1:
+                  raise SystemExit("Voci menu laterale non trovate")
+              s = s.replace(menu_anchor, '"ALLENAMENTO" to "HOME", "SCHEDE" to "SCHEDE", "PESI" to "PESI"', 1)
+
+          route_anchor = '                    "PESI" -> WeightsScreen(day, prefs)'
+          if '"SCHEDE" -> SchedeScreen' not in s:
+              route = '''                    "SCHEDE" -> SchedeScreen(context, prefs) { updated ->
+                                      routines = updated
+                                      day = "A"
+                                      checks = loadChecks(prefs, "A")
+                                      prefs.edit().putString("day", "A").apply()
+                                      tab = "HOME"
+                                  }
+          '''
+              if s.count(route_anchor) != 1:
+                  raise SystemExit("Punto di inserimento schermata SCHEDE non trovato")
+              s = s.replace(route_anchor, route + route_anchor, 1)
+
+          schede = r'''package it.gymtracker.app
+
+          import android.content.Context
+          import android.net.Uri
+          import androidx.activity.compose.rememberLauncherForActivityResult
+          import androidx.activity.result.contract.ActivityResultContracts
+          import androidx.compose.foundation.background
+          import androidx.compose.foundation.border
+          import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.lazy.LazyColumn
+          import androidx.compose.foundation.lazy.items
+          import androidx.compose.foundation.shape.RoundedCornerShape
+          import androidx.compose.material3.*
+          import androidx.compose.runtime.*
+          import androidx.compose.ui.Alignment
+          import androidx.compose.ui.Modifier
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.text.font.FontWeight
+          import androidx.compose.ui.unit.dp
+          import androidx.compose.ui.unit.sp
+          import com.google.mlkit.vision.common.InputImage
+          import com.google.mlkit.vision.text.TextRecognition
+          import com.google.mlkit.vision.text.latin.TextRecognizerOptions
+          import org.json.JSONArray
+          import org.json.JSONObject
+
+          private val SR = Color(0xFFFF1724)
+          private val SW = Color(0xFFF5F5F5)
+          private val SM = Color(0xFF9B9B9B)
+          private val SP = Color(0xFF101010)
+          private val SB = Color(0xFF8D0710)
+
+          internal fun encodeRoutineJson(data: Map<String, List<Exercise>>): String {
+              val root = JSONObject()
+              data.forEach { (day, list) ->
+                  val arr = JSONArray()
+                  list.forEach { ex -> arr.put(JSONObject().put("name", ex.name).put("sets", ex.sets).put("reps", ex.reps)) }
+                  root.put(day, arr)
+              }
+              return root.toString()
+          }
+
+          internal fun decodeRoutineJson(raw: String): Map<String, List<Exercise>> {
+              val root = JSONObject(raw)
+              return listOf("A", "B", "C").associateWith { day ->
+                  val arr = root.optJSONArray(day) ?: JSONArray()
+                  (0 until arr.length()).mapNotNull { i ->
+                      val item = arr.optJSONObject(i) ?: return@mapNotNull null
+                      val name = item.optString("name").trim()
+                      if (name.isBlank()) null else Exercise(name, item.optInt("sets", 3).coerceIn(1, 10), item.optString("reps", "10"))
+                  }
+              }
+          }
+
+          private fun parseRoutineText(raw: String): Map<String, List<Exercise>> {
+              val result = mutableMapOf("A" to mutableListOf<Exercise>(), "B" to mutableListOf<Exercise>(), "C" to mutableListOf<Exercise>())
+              var day = "A"
+              val pattern = Regex("""^(.+?)\s*(?:[-:|]\s*)?(\d{1,2})\s*[x×]\s*(\d{1,3}(?:\s*(?:sec|s))?|max|cedimento)\s*$""", RegexOption.IGNORE_CASE)
+              raw.lines().forEach { original ->
+                  val line = original.trim().replace(Regex("""\s+"""), " ")
+                  if (line.isBlank()) return@forEach
+                  val header = Regex("""^(?:GIORNO|SCHEDA|DAY)\s*([ABC])$|^([ABC])$""", RegexOption.IGNORE_CASE).matchEntire(line)
+                  if (header != null) {
+                      day = (header.groupValues[1].ifBlank { header.groupValues[2] }).uppercase()
+                      return@forEach
+                  }
+                  val match = pattern.matchEntire(line) ?: return@forEach
+                  val name = match.groupValues[1].trim().trim('-', ':', '|', '•')
+                  val sets = match.groupValues[2].toIntOrNull()?.coerceIn(1, 10) ?: 3
+                  val reps = match.groupValues[3].trim()
+                  if (name.length >= 2 && result[day]!!.size < 30) result[day]!!.add(Exercise(name.uppercase(), sets, reps))
+              }
+              return mapOf("A" to result["A"]!!.toList(), "B" to result["B"]!!.toList(), "C" to result["C"]!!.toList())
+          }
+
+          @Composable
+          internal fun SchedeScreen(context: Context, prefs: android.content.SharedPreferences,
+              onActivate: (Map<String, List<Exercise>>) -> Unit) {
+              var title by remember { mutableStateOf("La mia nuova scheda") }
+              var editor by remember { mutableStateOf("GIORNO A\nPanca piana 4x10\nLat machine 3x12\n\nGIORNO B\nPulley 3x10") }
+              var message by remember { mutableStateOf("Carica una foto oppure inserisci gli esercizi nel formato Nome esercizio 3x10.") }
+              var busy by remember { mutableStateOf(false) }
+              var savedPlans by remember { mutableStateOf(prefs.getString("saved_plans_json", "[]") ?: "[]") }
+              val launcher = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+                  if (uri != null) {
+                      busy = true
+                      message = "Lettura della scheda in corso…"
+                      try {
+                          val image = InputImage.fromFilePath(context, uri)
+                          val recognizer = TextRecognition.getClient(TextRecognizerOptions.DEFAULT_OPTIONS)
+                          recognizer.process(image)
+                              .addOnSuccessListener { result ->
+                                  editor = result.text
+                                  message = if (result.text.isBlank()) "Nessun testo riconosciuto. Inserisci i dati manualmente." else "Testo riconosciuto: controlla e correggi prima di salvare."
+                                  busy = false
+                                  recognizer.close()
+                              }
+                              .addOnFailureListener { error ->
+                                  message = "Lettura non riuscita: " + (error.localizedMessage ?: "riprova")
+                                  busy = false
+                                  recognizer.close()
+                              }
+                      } catch (error: Exception) {
+                          message = "Impossibile aprire la foto: " + (error.localizedMessage ?: "errore")
+                          busy = false
+                      }
+                  }
+              }
+
+              Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                  Text("LE TUE SCHEDE", color = SW, fontSize = 22.sp, fontWeight = FontWeight.Black)
+                  Text("IMPORTA • MODIFICA • ARCHIVIA • ATTIVA", color = SR, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                  Button(onClick = { launcher.launch("image/*") }, enabled = !busy,
+                      colors = ButtonDefaults.buttonColors(containerColor = SR), modifier = Modifier.fillMaxWidth()) {
+                      Text(if (busy) "LETTURA IN CORSO…" else "SCEGLI FOTO DELLA SCHEDA", color = SW)
+                  }
+                  Text("CONTROLLA E MODIFICA", color = SW, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                  OutlinedTextField(value = title, onValueChange = { title = it }, singleLine = true,
+                      label = { Text("Nome della scheda") }, modifier = Modifier.fillMaxWidth())
+                  OutlinedTextField(value = editor, onValueChange = { editor = it }, modifier = Modifier.fillMaxWidth().height(220.dp),
+                      label = { Text("Esercizi • serie x ripetizioni") },
+                      supportingText = { Text("Formato: GIORNO A, poi Panca piana 4x10. Ripeti per B e C.", color = SM) })
+                  Text(message, color = SM, fontSize = 11.sp)
+                  Button(onClick = {
+                      val parsed = parseRoutineText(editor)
+                      val count = parsed.values.sumOf { it.size }
+                      if (count == 0) {
+                          message = "Nessun esercizio valido. Scrivi ogni riga così: Panca piana 4x10."
+                      } else {
+                          val routineJson = encodeRoutineJson(parsed)
+                          val plans = runCatching { JSONArray(savedPlans) }.getOrElse { JSONArray() }
+                          val name = title.trim().ifBlank { "Scheda " + (plans.length() + 1) }
+                          plans.put(JSONObject().put("name", name).put("routine", routineJson).put("createdAt", System.currentTimeMillis()))
+                          savedPlans = plans.toString()
+                          prefs.edit().putString("saved_plans_json", savedPlans)
+                              .putString("active_routine_json", routineJson).putString("active_routine_name", name).apply()
+                          onActivate(parsed)
+                          message = "Scheda salvata e attivata: " + count + " esercizi."
+                      }
+                  }, enabled = !busy, modifier = Modifier.fillMaxWidth(),
+                      colors = ButtonDefaults.buttonColors(containerColor = SR)) {
+                      Text("SALVA E ATTIVA SCHEDA", color = SW, fontWeight = FontWeight.Black)
+                  }
+                  HorizontalDivider(color = SB)
+                  Text("ARCHIVIO SCHEDE", color = SW, fontSize = 14.sp, fontWeight = FontWeight.Black)
+                  val plans = runCatching { JSONArray(savedPlans) }.getOrElse { JSONArray() }
+                  if (plans.length() == 0) {
+                      Text("Le schede salvate compariranno qui.", color = SM, fontSize = 11.sp)
+                  } else {
+                      LazyColumn(Modifier.heightIn(max = 220.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {
+                          items((0 until plans.length()).mapNotNull { plans.optJSONObject(it) }) { plan ->
+                              val name = plan.optString("name", "Scheda salvata")
+                              Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(10.dp)).background(SP)
+                                  .border(1.dp, SB, RoundedCornerShape(10.dp)).padding(10.dp),
+                                  verticalAlignment = Alignment.CenterVertically) {
+                                  Text(name, color = SW, modifier = Modifier.weight(1f), fontSize = 12.sp)
+                                  TextButton(onClick = {
+                                      runCatching {
+                                          val json = plan.getString("routine")
+                                          val data = decodeRoutineJson(json)
+                                          prefs.edit().putString("active_routine_json", json).putString("active_routine_name", name).apply()
+                                          onActivate(data)
+                                          message = "Scheda attivata: " + name
+                                      }.onFailure { message = "Questa scheda non è leggibile." }
+                                  }) { Text("ATTIVA", color = SR, fontWeight = FontWeight.Black) }
+                              }
+                          }
+                      }
+                  }
+              }
+          }
+          '''
+          (pkg / "SchedeScreen.kt").write_text(schede, encoding="utf-8")
+          main.write_text(s, encoding="utf-8")
+          print("Sezione SCHEDE con importazione foto OCR, modifica manuale, archivio e attivazione integrata.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
