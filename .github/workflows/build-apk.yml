@@ -2222,14 +2222,14 @@ jobs:
                       Text("Il grafico dettagliato sarà mostrato quando saranno disponibili dati storici sufficienti.",color=PM,fontSize=9.sp)
                   }
                   Panel("IMPOSTAZIONI PERSONALI"){
-                      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Setting("🔔","NOTIFICHE");Setting("🎨","ASPETTO APP");Setting("⏱","TIMER E SUONI");Setting("👤","ACCOUNT")}
+                      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Setting(Modifier.weight(1f),"🔔","NOTIFICHE");Setting(Modifier.weight(1f),"🎨","ASPETTO APP");Setting(Modifier.weight(1f),"⏱","TIMER E SUONI");Setting(Modifier.weight(1f),"👤","ACCOUNT")}
                   }
                   Button(onClick=onSignOut,modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF790914)),shape=RoundedCornerShape(10.dp)){Text("ESCI DALL'ACCOUNT",color=PW,fontWeight=FontWeight.Black)}
               }
           }
           @Composable private fun Panel(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(PP).border(1.dp,Color(0xFF68101A),RoundedCornerShape(14.dp)).padding(11.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){Text(title,color=PR,fontSize=11.sp,fontWeight=FontWeight.Black);content()}}
           @Composable private fun Metric(icon:String,value:String,label:String){Column(horizontalAlignment=Alignment.CenterHorizontally){Text(icon,fontSize=17.sp);Text(value,color=PW,fontSize=16.sp,fontWeight=FontWeight.Black);Text(label,color=PM,fontSize=7.sp,textAlign=TextAlign.Center)}}
-          @Composable private fun Setting(icon:String,label:String){Column(Modifier.weight(1f).background(Color(0xFF09090A),RoundedCornerShape(8.dp)).padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally){Text(icon,fontSize=17.sp);Text(label,color=PW,fontSize=7.sp,textAlign=TextAlign.Center)}}
+          @Composable private fun Setting(modifier:Modifier,icon:String,label:String){Column(modifier.background(Color(0xFF09090A),RoundedCornerShape(8.dp)).padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally){Text(icon,fontSize=17.sp);Text(label,color=PW,fontSize=7.sp,textAlign=TextAlign.Center)}}
           '''
           (pkg/"ProfileScreen.kt").write_text(code,encoding="utf-8")
           print("Profilo Racing e trofei retroattivi inseriti.")
