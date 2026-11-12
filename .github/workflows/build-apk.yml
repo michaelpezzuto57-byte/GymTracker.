@@ -290,7 +290,8 @@ jobs:
 
       - name: Integrate the exact official app icon
         run: |
-          python3 -m pip install --quiet pillow
+          python3 -m venv "$RUNNER_TEMP/photo-venv"
+          "$RUNNER_TEMP/photo-venv/bin/pip" install --quiet pillow
           python3 - <<'PY'
           from pathlib import Path
           from PIL import Image
@@ -1819,12 +1820,12 @@ jobs:
       - name: Create numbered exercise photo contact sheet
         run: |
           python3 -m pip install --quiet pillow
-          python3 - <<'PY'
+          "$RUNNER_TEMP/photo-venv/bin/python" - <<'PY'
           from pathlib import Path
           from PIL import Image, ImageOps, ImageDraw
           import re
           src = Path("project/GymTrackerNative/app/src/main/res/drawable-nodpi")
-          files = sorted(src.glob("exercise_*.jpg"), key=lambda p: int(re.search(r"(\\d+)", p.stem).group(1)))
+          files = sorted(src.glob("exercise_*.jpg"), key=lambda p: int(re.search(r"(\d+)", p.stem).group(1)))
           if len(files) != 27:
               raise SystemExit(f"Attese 27 foto, trovate {len(files)}")
           cell_w, cell_h, label_h = 240, 190, 34
