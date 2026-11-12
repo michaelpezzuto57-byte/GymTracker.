@@ -243,22 +243,19 @@ jobs:
           if count != 1: raise SystemExit("Could not locate original timer loop")
           old = '                        if (updated[idx]) { seconds = 90; timerActive = true }'
           new = '''                        if (updated[idx]) {
-                                  timerEndAt = System.currentTimeMillis() + 90_000L
-                                  seconds = 90
+                                  val restDuration = prefs.getInt("rest_duration_seconds", 60).coerceIn(30, 120)
+                                  timerEndAt = System.currentTimeMillis() + restDuration * 1000L
+                                  seconds = restDuration
                                   timerActive = true
                                   prefs.edit().putLong(RestTimerService.KEY_END_AT, timerEndAt).apply()
                                   val serviceIntent = Intent(context, RestTimerService::class.java).putExtra(RestTimerService.EXTRA_END_AT, timerEndAt)
                                   ContextCompat.startForegroundService(context, serviceIntent)
-                                  // Start the real Android system timer without its setup screen.
                                   val systemTimerIntent = Intent(android.provider.AlarmClock.ACTION_SET_TIMER).apply {
-                                      putExtra(android.provider.AlarmClock.EXTRA_LENGTH, 90)
+                                      putExtra(android.provider.AlarmClock.EXTRA_LENGTH, restDuration)
                                       putExtra(android.provider.AlarmClock.EXTRA_MESSAGE, "Gym Tracker - Recupero")
                                       putExtra(android.provider.AlarmClock.EXTRA_SKIP_UI, true)
                                   }
                                   context.startActivity(systemTimerIntent)
-                                  // Keep the user in Gym Tracker: the foreground service and in-app
-                                  // countdown run the 90-second rest timer without opening Clock.
-
                               }'''
           if old not in s: raise SystemExit("Could not locate set-complete timer callback")
           s = s.replace(old, new)
