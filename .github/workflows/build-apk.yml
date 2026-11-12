@@ -1930,11 +1930,11 @@ jobs:
                   raise SystemExit("SharedPreferences iniziali non trovate")
               s = s.replace(prefs_line, prefs_line + load_code, 1)
 
-          menu_anchor = 'listOf("ALLENAMENTO" to "HOME", "PESI" to "PESI", "STORICO" to "STORICO"'
+          menu_anchor = '"ALLENAMENTO" to "HOME"'
           if '"SCHEDE" to "SCHEDE"' not in s:
               if s.count(menu_anchor) != 1:
-                  raise SystemExit("Voci menu laterale non trovate")
-              s = s.replace(menu_anchor, 'listOf("ALLENAMENTO" to "HOME", "SCHEDE" to "SCHEDE", "PESI" to "PESI", "STORICO" to "STORICO"', 1)
+                  raise SystemExit("Voce ALLENAMENTO del menu laterale non trovata in modo univoco")
+              s = s.replace(menu_anchor, menu_anchor + ', "SCHEDE" to "SCHEDE"', 1)
 
           route_anchor = '                    "PESI" -> WeightsScreen(day, prefs)'
           if '"SCHEDE" -> SchedeScreen' not in s:
