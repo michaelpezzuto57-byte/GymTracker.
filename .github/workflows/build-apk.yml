@@ -2133,6 +2133,108 @@ jobs:
           print("Sezione SCHEDE con importazione foto OCR, modifica manuale, archivio e attivazione integrata.")
           PY
 
+      - name: Build Racing Profile with retroactive achievements
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os, re
+          pkg=Path(os.environ["PROJECT_DIR"])/"app/src/main/java/it/gymtracker/app"
+          main=pkg/"MainActivity.kt"
+          s=main.read_text(encoding="utf-8")
+          pattern=r'                    "PROFILE" -> Column\(Modifier\.fillMaxWidth\(\)\.background\(Panel\)\.padding\(18\.dp\)\) \{\n.*?TextButton\(onClick = \{ tab = "HOME" \}\) \{ Text\("TORNA ALL\'ALLENAMENTO", color = Red\) \}\n                    \}'
+          replacement='''                    "PROFILE" -> ProfileScreen(history, prefs) {
+                          com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
+                          tab = "HOME"
+                      }'''
+          s,n=re.subn(pattern,replacement,s,count=1,flags=re.S)
+          if n!=1: raise SystemExit("Schermata PROFILE attuale non trovata in modo univoco")
+          main.write_text(s,encoding="utf-8")
+          code=r'''package it.gymtracker.app
+          import androidx.compose.foundation.*
+          import androidx.compose.foundation.layout.*
+          import androidx.compose.foundation.shape.*
+          import androidx.compose.material3.*
+          import androidx.compose.runtime.*
+          import androidx.compose.ui.*
+          import androidx.compose.ui.draw.clip
+          import androidx.compose.ui.graphics.Color
+          import androidx.compose.ui.text.font.*
+          import androidx.compose.ui.text.style.TextAlign
+          import androidx.compose.ui.unit.*
+          import com.google.firebase.auth.FirebaseAuth
+          import java.util.Date
+          import java.text.SimpleDateFormat
+          import java.util.Locale
+
+          private val PR=Color(0xFFFF1724)
+          private val PP=Color(0xFF141518)
+          private val PW=Color(0xFFF5F5F5)
+          private val PM=Color(0xFF9A9A9D)
+          private data class Trophy(val id:String,val name:String,val xp:Int,val earned:Boolean)
+
+          @Composable
+          internal fun ProfileScreen(history:String,prefs:android.content.SharedPreferences,onSignOut:()->Unit) {
+              val user=FirebaseAuth.getInstance().currentUser
+              val sessions=history.lines().filter{it.isNotBlank()}
+              val sets=sessions.sumOf{Regex("(\\d+)/(\\d+) serie").find(it)?.groupValues?.get(1)?.toIntOrNull()?:0}
+              val dates=prefs.getStringSet("workout_dates",emptySet())?.toSet()?:emptySet()
+              val streak=remember(dates){var n=0;var d=java.time.LocalDate.now();if(d.toString() !in dates)d=d.minusDays(1);while(d.toString() in dates&&n<3650){n++;d=d.minusDays(1)};n}
+              val data=listOf(
+                  Triple("first","PRIMO ALLENAMENTO",40) to (sessions.size>=1),
+                  Triple("ten","COSTANZA",80) to (sessions.size>=10),
+                  Triple("25","DETERMINAZIONE",120) to (sessions.size>=25),
+                  Triple("50","GYM RACER",200) to (sessions.size>=50),
+                  Triple("100sets","CENTO SERIE",60) to (sets>=100),
+                  Triple("500sets","CINQUECENTO",140) to (sets>=500),
+                  Triple("7days","SETTE GIORNI",100) to (streak>=7))
+              val ids=data.filter{it.second}.map{it.first.first}.toSet()
+              LaunchedEffect(ids){val old=prefs.getStringSet("profile_awards_v1",emptySet())?.toMutableSet()?:mutableSetOf();if(ids.any{it !in old}){old.addAll(ids);prefs.edit().putStringSet("profile_awards_v1",old).apply()}}
+              val trophies=data.map{Trophy(it.first.first,it.first.second,it.first.third,it.second)}
+              val xp=sessions.size*20+trophies.filter{it.earned}.sumOf{it.xp}
+              val email=user?.email?:"Account locale"
+              val name=user?.displayName?.takeIf{it.isNotBlank()}?:email.substringBefore("@").ifBlank{"GymRacer"}
+              val joined=user?.metadata?.creationTimestamp?.let{SimpleDateFormat("dd/MM/yyyy",Locale.ITALY).format(Date(it))}?:"—"
+              Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+                  Text("IL MIO PROFILO",color=PW,fontSize=25.sp,fontWeight=FontWeight.Black,fontStyle=FontStyle.Italic)
+                  Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(PP).border(1.dp,PR,RoundedCornerShape(16.dp)).padding(13.dp),verticalAlignment=Alignment.CenterVertically){
+                      Box(Modifier.size(62.dp).clip(CircleShape).background(Color(0xFF09090A)).border(2.dp,PR,CircleShape),contentAlignment=Alignment.Center){Text("🏆",fontSize=28.sp)}
+                      Spacer(Modifier.width(12.dp))
+                      Column(Modifier.weight(1f),verticalArrangement=Arrangement.spacedBy(4.dp)){
+                          Text(name,color=PW,fontSize=17.sp,fontWeight=FontWeight.Black)
+                          Text(email,color=PM,fontSize=10.sp)
+                          Text("MEMBRO DAL "+joined,color=PR,fontSize=9.sp,fontWeight=FontWeight.Bold)
+                          Text("LIVELLO "+(xp/250+1)+"  •  "+xp+" XP",color=PW,fontSize=11.sp,fontWeight=FontWeight.Bold)
+                          LinearProgressIndicator(progress={(xp%250)/250f},color=PR,trackColor=Color.DarkGray,modifier=Modifier.fillMaxWidth().height(5.dp))
+                      }
+                  }
+                  Panel("LA MIA CARRIERA"){
+                      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){
+                          Metric("🏋",sessions.size.toString(),"ALLENAMENTI");Metric("⚡",sets.toString(),"SERIE");Metric("⏱","—","TEMPO");Metric("🔥",streak.toString(),"GIORNI FILA")
+                      }
+                  }
+                  Panel("OBIETTIVI E TROFEI  •  "+trophies.count{it.earned}+"/"+trophies.size){
+                      trophies.chunked(4).forEach{row->Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceAround){row.forEach{t->Column(Modifier.weight(1f).padding(4.dp),horizontalAlignment=Alignment.CenterHorizontally){Box(Modifier.size(46.dp).clip(RoundedCornerShape(12.dp)).background(if(t.earned)Color(0xFF3B1016) else Color(0xFF242426)).border(1.dp,if(t.earned)PR else Color.Gray,RoundedCornerShape(12.dp)),contentAlignment=Alignment.Center){Text(if(t.earned)"🏅" else "🔒",fontSize=21.sp)};Text(t.name,color=if(t.earned)PW else PM,fontSize=8.sp,textAlign=TextAlign.Center)}}}}
+                      Text("Trofei riconosciuti anche dagli allenamenti già salvati.",color=PM,fontSize=9.sp)
+                  }
+                  Panel("I MIEI PROGRESSI"){
+                      Text("ALLENAMENTI COMPLETATI: "+sessions.size,color=PW,fontSize=12.sp)
+                      Text("Il grafico dettagliato sarà mostrato quando saranno disponibili dati storici sufficienti.",color=PM,fontSize=9.sp)
+                  }
+                  Panel("IMPOSTAZIONI PERSONALI"){
+                      Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween){Setting("🔔","NOTIFICHE");Setting("🎨","ASPETTO APP");Setting("⏱","TIMER E SUONI");Setting("👤","ACCOUNT")}
+                  }
+                  Button(onClick=onSignOut,modifier=Modifier.fillMaxWidth(),colors=ButtonDefaults.buttonColors(containerColor=Color(0xFF790914)),shape=RoundedCornerShape(10.dp)){Text("ESCI DALL'ACCOUNT",color=PW,fontWeight=FontWeight.Black)}
+              }
+          }
+          @Composable private fun Panel(title:String,content:@Composable ColumnScope.()->Unit){Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(PP).border(1.dp,Color(0xFF68101A),RoundedCornerShape(14.dp)).padding(11.dp),verticalArrangement=Arrangement.spacedBy(9.dp)){Text(title,color=PR,fontSize=11.sp,fontWeight=FontWeight.Black);content()}}
+          @Composable private fun Metric(icon:String,value:String,label:String){Column(horizontalAlignment=Alignment.CenterHorizontally){Text(icon,fontSize=17.sp);Text(value,color=PW,fontSize=16.sp,fontWeight=FontWeight.Black);Text(label,color=PM,fontSize=7.sp,textAlign=TextAlign.Center)}}
+          @Composable private fun Setting(icon:String,label:String){Column(Modifier.weight(1f).background(Color(0xFF09090A),RoundedCornerShape(8.dp)).padding(7.dp),horizontalAlignment=Alignment.CenterHorizontally){Text(icon,fontSize=17.sp);Text(label,color=PW,fontSize=7.sp,textAlign=TextAlign.Center)}}
+          '''
+          (pkg/"ProfileScreen.kt").write_text(code,encoding="utf-8")
+          print("Profilo Racing e trofei retroattivi inseriti.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
