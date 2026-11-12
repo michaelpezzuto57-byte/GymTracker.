@@ -1824,20 +1824,21 @@ jobs:
           p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
           s = p.read_text(encoding="utf-8")
 
-          # Restore Kotlin string-template interpolation in the guide screen.
-          s = s.replace(r"\\$", "$") if False else s
+          # Ripristina l'interpolazione Kotlin mostrata letteralmente nella schermata.
           s = s.replace(r"\${", "${")
 
-          # Replace the generic stick-figure pair with the real exercise photo.
+          # Sostituisce il riquadro con le due sagome con la foto reale dell'esercizio.
           label = 'listOf("POSIZIONE INIZIALE", "FASE DEL MOVIMENTO")'
-          if label in s:
-              label_pos = s.index(label)
-              row_start = s.rfind('Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {', 0, label_pos)
-              muscle_marker = 'Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {\n                          Text("MUSCOLI COINVOLTI"'
-              muscle_start = s.find(muscle_marker, label_pos)
-              if row_start < 0 or muscle_start < 0:
-                  raise SystemExit("Blocco immagini guida non riconosciuto: build interrotta senza modifiche parziali")
-              photo_block = '''Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel)
+          label_pos = s.find(label)
+          if label_pos < 0:
+              raise SystemExit("Elenco delle fasi guida non trovato")
+          row_marker = 'Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {'
+          row_start = s.rfind(row_marker, 0, label_pos)
+          muscle_marker = 'Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel).padding(13.dp), verticalArrangement = Arrangement.spacedBy(7.dp)) {'
+          muscle_start = s.find(muscle_marker, label_pos)
+          if row_start < 0 or muscle_start < 0 or muscle_start <= row_start:
+              raise SystemExit("Sezione immagini guida non riconosciuta; nessuna modifica parziale")
+          photo_block = '''Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(12.dp)).background(Panel)
                           .border(1.dp, RedDark, RoundedCornerShape(12.dp)).padding(8.dp)) {
                           ExerciseThumbnail(current.name, Modifier.fillMaxWidth().height(220.dp)
                               .clip(RoundedCornerShape(8.dp)))
@@ -1846,13 +1847,14 @@ jobs:
                               fontWeight = FontWeight.Black, textAlign = TextAlign.Center,
                               modifier = Modifier.fillMaxWidth())
                       }
+                      
                       '''
-              s = s[:row_start] + photo_block + s[muscle_start:]
+          s = s[:row_start] + photo_block + s[muscle_start:]
 
           if r"\${groupFor(current.name)}" in s or r"\${index + 1}" in s:
-              raise SystemExit("Template Kotlin ancora escapati nella guida")
+              raise SystemExit("Sono rimasti template Kotlin escapati")
           p.write_text(s, encoding="utf-8")
-          print("Dettaglio guida aggiornato: foto reale dell'esercizio e testi dinamici corretti.")
+          print("Guida esercizi corretta: foto reale e interpolazione dei testi ripristinata.")
           PY
 
       - name: Build APK
