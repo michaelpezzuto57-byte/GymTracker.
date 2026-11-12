@@ -1948,7 +1948,7 @@ jobs:
           '''
               if s.count(route_anchor) != 1:
                   raise SystemExit("Route STORICO non trovata in modo univoco per inserire SCHEDE")
-              s = s.replace(route_anchor, route_anchor + '\\n' + route, 1)
+              s = s.replace(route_anchor, route_anchor + '\n' + route, 1)
 
           schede = r'''package it.gymtracker.app
 
