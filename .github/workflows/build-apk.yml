@@ -1819,7 +1819,8 @@ jobs:
           
       - name: Create numbered exercise photo contact sheet
         run: |
-          python3 -m pip install --quiet pillow
+          python3 -m venv "$RUNNER_TEMP/photo-venv"
+          "$RUNNER_TEMP/photo-venv/bin/pip" install --quiet pillow
           "$RUNNER_TEMP/photo-venv/bin/python" - <<'PY'
           from pathlib import Path
           from PIL import Image, ImageOps, ImageDraw
