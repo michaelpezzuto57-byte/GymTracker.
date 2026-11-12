@@ -1816,6 +1816,37 @@ jobs:
           test "$(find "$DRAWABLE_DIR" -maxdepth 1 -name 'exercise_*.jpg' | wc -l)" -eq 27
           echo "Installate 27 foto esercizi in drawable-nodpi."
           
+      - name: Create numbered exercise photo contact sheet
+        run: |
+          python3 -m pip install --quiet pillow
+          python3 - <<'PY'
+          from pathlib import Path
+          from PIL import Image, ImageOps, ImageDraw
+          import re
+          src = Path("project/GymTrackerNative/app/src/main/res/drawable-nodpi")
+          files = sorted(src.glob("exercise_*.jpg"), key=lambda p: int(re.search(r"(\\d+)", p.stem).group(1)))
+          if len(files) != 27:
+              raise SystemExit(f"Attese 27 foto, trovate {len(files)}")
+          cell_w, cell_h, label_h = 240, 190, 34
+          sheet = Image.new("RGB", (cell_w * 3, (cell_h + label_h) * 9), "#171717")
+          draw = ImageDraw.Draw(sheet)
+          for i, path in enumerate(files):
+              im = Image.open(path).convert("RGB")
+              im = ImageOps.fit(im, (cell_w, cell_h))
+              x, y = (i % 3) * cell_w, (i // 3) * (cell_h + label_h)
+              sheet.paste(im, (x, y))
+              draw.text((x + 8, y + cell_h + 8), f"EXERCISE {i+1:02d}", fill="white")
+          out = Path("exercise-photo-contact-sheet.jpg")
+          sheet.save(out, quality=92)
+          print(f"Creato {out}")
+          PY
+      - name: Upload exercise photo contact sheet
+        uses: actions/upload-artifact@v4
+        with:
+          name: Exercise-Photo-Contact-Sheet
+          path: exercise-photo-contact-sheet.jpg
+          if-no-files-found: error
+
       - name: Fix exercise detail guide photos and Kotlin interpolation
         run: |
           set -euo pipefail
