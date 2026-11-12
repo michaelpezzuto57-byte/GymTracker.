@@ -292,7 +292,7 @@ jobs:
         run: |
           python3 -m venv "$RUNNER_TEMP/photo-venv"
           "$RUNNER_TEMP/photo-venv/bin/pip" install --quiet pillow
-          python3 - <<'PY'
+          "$RUNNER_TEMP/photo-venv/bin/python" - <<'PY'
           from pathlib import Path
           from PIL import Image
           import os, re
