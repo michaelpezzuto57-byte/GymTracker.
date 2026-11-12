@@ -951,14 +951,15 @@ jobs:
           p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
           s = p.read_text(encoding="utf-8")
 
-          route_anchor = '                    "RESULT" -> ResultScreen('
+          route_anchor = '                        else -> HistoryScreen(history, { history = ""; prefs.edit().remove("history").apply() })'
           routes = '''                    "STATISTICHE" -> StatsScreen(history)
                               "CALENDARIO" -> CalendarScreen(prefs)
-                              "RECORD" -> RecordsScreen(prefs)'''
+                              "RECORD" -> RecordsScreen(prefs)
+                              else -> HistoryScreen(history, { history = ""; prefs.edit().remove("history").apply() })'''
           if '"STATISTICHE" -> StatsScreen(history)' not in s:
               if s.count(route_anchor) != 1:
-                  raise SystemExit("PESI route not found for progress screens")
-              s = s.replace(route_anchor, route_anchor + "\n" + routes, 1)
+                  raise SystemExit("Fallback route not found uniquely for progress screens")
+              s = s.replace(route_anchor, routes, 1)
 
           if 'val dateKey = java.text.SimpleDateFormat' not in s:
               anchor = '                        if (finish) {'
