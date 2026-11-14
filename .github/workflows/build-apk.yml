@@ -2140,7 +2140,7 @@ jobs:
           main=pkg/"MainActivity.kt"
           s=main.read_text(encoding="utf-8")
           pattern=r'                    "PROFILE" -> Column\(Modifier\.fillMaxWidth\(\)\.background\(Panel\)\.padding\(18\.dp\)\) \{\n.*?TextButton\(onClick = \{ tab = "HOME" \}\) \{ Text\("TORNA ALL\'ALLENAMENTO", color = Red\) \}\n                    \}'
-          replacement='''                    "PROFILE" -> ProfileScreen(history, prefs) {
+          replacement='''                    "PROFILE" -> ProfileScreen(history, prefs, Modifier.weight(1f)) {
                           com.google.firebase.auth.FirebaseAuth.getInstance().signOut()
                           tab = "HOME"
                       }'''
@@ -2171,7 +2171,7 @@ jobs:
           private data class Trophy(val id:String,val name:String,val xp:Int,val earned:Boolean)
 
           @Composable
-          internal fun ProfileScreen(history:String,prefs:android.content.SharedPreferences,onSignOut:()->Unit) {
+          internal fun ProfileScreen(history:String,prefs:android.content.SharedPreferences,modifier:Modifier=Modifier,onSignOut:()->Unit) {
               var selectedSettings by remember { mutableStateOf<String?>(null) }
               val user=FirebaseAuth.getInstance().currentUser
               val sessions=history.lines().filter{it.isNotBlank()}
@@ -2193,7 +2193,7 @@ jobs:
               val email=user?.email?:"Account locale"
               val name=user?.displayName?.takeIf{it.isNotBlank()}?:email.substringBefore("@").ifBlank{"GymRacer"}
               val joined=user?.metadata?.creationTimestamp?.let{SimpleDateFormat("dd/MM/yyyy",Locale.ITALY).format(Date(it))}?:"—"
-              Column(Modifier.fillMaxWidth().padding(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
+              Column(modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(10.dp),verticalArrangement=Arrangement.spacedBy(10.dp)){
                   Text("IL MIO PROFILO",color=PW,fontSize=25.sp,fontWeight=FontWeight.Black,fontStyle=FontStyle.Italic)
                   Row(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(PP).border(1.dp,PR,RoundedCornerShape(16.dp)).padding(13.dp),verticalAlignment=Alignment.CenterVertically){
                       Box(Modifier.size(62.dp).clip(CircleShape).background(Color(0xFF09090A)).border(2.dp,PR,CircleShape),contentAlignment=Alignment.Center){Text("🏆",fontSize=28.sp)}
