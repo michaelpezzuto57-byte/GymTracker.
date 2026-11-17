@@ -2298,6 +2298,150 @@ jobs:
           print("Profilo Racing e impostazioni personali interattive inseriti.")
           PY
 
+      - name: Add individual workout history deletion
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+
+          history_line = '                        history = (listOf(line) + history.lines().filter { it.isNotBlank() }).take(50).joinToString("\\n")'
+          metadata = r''' 
+                        val oldSessionDates = prefs.getString("history_session_dates_v1", null)
+                        val oldDatesArray = org.json.JSONArray()
+                        if (oldSessionDates != null) {
+                            val parsed = org.json.JSONArray(oldSessionDates)
+                            for (i in 0 until minOf(parsed.length(), 49)) oldDatesArray.put(parsed.optString(i, ""))
+                        } else {
+                            repeat((history.lines().count { it.isNotBlank() } - 1).coerceAtLeast(0).coerceAtMost(49)) { oldDatesArray.put("") }
+                        }
+                        val updatedSessionDates = org.json.JSONArray()
+                        updatedSessionDates.put(if (finish) java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.getDefault()).format(java.util.Date()) else "")
+                        for (i in 0 until minOf(oldDatesArray.length(), 49)) updatedSessionDates.put(oldDatesArray.optString(i, ""))
+                        prefs.edit().putString("history_session_dates_v1", updatedSessionDates.toString()).apply()'''
+          if s.count(history_line) != 1:
+              raise SystemExit("Riga di salvataggio dello storico non trovata in modo univoco")
+          s = s.replace(history_line, history_line + "\n" + metadata, 1)
+
+          calendar_anchor = '                            val dates = prefs.getStringSet("workout_dates", emptySet())?.toMutableSet() ?: mutableSetOf()'
+          legacy = '''                            if (!prefs.contains("legacy_workout_dates_v1")) {
+                                val previousCalendarDates = prefs.getStringSet("workout_dates", emptySet())?.toSet() ?: emptySet()
+                                prefs.edit().putStringSet("legacy_workout_dates_v1", previousCalendarDates).apply()
+                            }
+          '''
+          if s.count(calendar_anchor) != 1:
+              raise SystemExit("Salvataggio date calendario non trovato in modo univoco")
+          s = s.replace(calendar_anchor, legacy + calendar_anchor, 1)
+
+          old_route = 'HistoryScreen(history, { history = ""; prefs.edit().remove("history").apply() })'
+          new_route = 'HistoryScreen(history) { index -> history = removeWorkoutHistoryEntry(history, index, prefs) }'
+          if s.count(old_route) != 2:
+              raise SystemExit(f"Route dello storico non trovate entrambe (trovate: {s.count(old_route)})")
+          s = s.replace(old_route, new_route)
+
+          start = s.find("@Composable\nprivate fun HistoryScreen(")
+          end = s.find("\n\n@Composable\nprivate fun ResultScreen", start)
+          if start < 0 or end < 0:
+              raise SystemExit("Schermata HistoryScreen non trovata con confini sicuri")
+          replacement = r'''@Composable
+          private fun HistoryScreen(history: String, onDelete: (Int) -> Unit) {
+              var pendingDelete by remember { mutableStateOf<Int?>(null) }
+              val sessions = history.lines().filter { it.isNotBlank() }
+              Column(Modifier.fillMaxWidth().weight(1f, fill = false)) {
+                  Text("STORICO", color = White, fontSize = 22.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic)
+                  Text("LE TUE SESSIONI SALVATE", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Bold)
+                  Spacer(Modifier.height(14.dp))
+                  if (sessions.isEmpty()) {
+                      Text("Nessun allenamento registrato.", color = Muted)
+                  } else {
+                      LazyColumn(Modifier.weight(1f)) {
+                          itemsIndexed(sessions) { index, line ->
+                              Row(
+                                  Modifier.fillMaxWidth().padding(bottom = 8.dp).clip(RoundedCornerShape(12.dp))
+                                      .background(Panel).border(1.dp, RedDark, RoundedCornerShape(12.dp)).padding(12.dp),
+                                  verticalAlignment = Alignment.CenterVertically
+                              ) {
+                                  Text("🏆", fontSize = 20.sp)
+                                  Spacer(Modifier.width(10.dp))
+                                  Text(line, color = White, fontSize = 12.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                                  TextButton(onClick = { pendingDelete = index }) {
+                                      Text("ELIMINA", color = Red, fontSize = 10.sp, fontWeight = FontWeight.Black)
+                                  }
+                              }
+                          }
+                      }
+                  }
+              }
+              val deleteIndex = pendingDelete
+              if (deleteIndex != null) {
+                  AlertDialog(
+                      onDismissRequest = { pendingDelete = null },
+                      title = { Text("ELIMINARE ALLENAMENTO?", color = White, fontWeight = FontWeight.Black) },
+                      text = { Text("Questa sessione verrà rimossa dallo storico e dalle statistiche. L'operazione non si può annullare.", color = Muted) },
+                      confirmButton = {
+                          TextButton(onClick = {
+                              onDelete(deleteIndex)
+                              pendingDelete = null
+                          }) { Text("ELIMINA", color = Red, fontWeight = FontWeight.Black) }
+                      },
+                      dismissButton = {
+                          TextButton(onClick = { pendingDelete = null }) { Text("ANNULLA", color = White) }
+                      },
+                      containerColor = Panel
+                  )
+              }
+          }'''
+          s = s[:start] + replacement + s[end:]
+
+          helper = r'''
+
+          private fun removeWorkoutHistoryEntry(
+              currentHistory: String,
+              index: Int,
+              prefs: android.content.SharedPreferences
+          ): String {
+              val sessions = currentHistory.lines().filter { it.isNotBlank() }
+              if (index !in sessions.indices) return currentHistory
+
+              val storedDates = prefs.getString("history_session_dates_v1", null)
+              val sessionDates = org.json.JSONArray()
+              if (storedDates != null) {
+                  val parsed = org.json.JSONArray(storedDates)
+                  for (i in 0 until parsed.length()) sessionDates.put(parsed.optString(i, ""))
+              } else {
+                  repeat(sessions.size) { sessionDates.put("") }
+              }
+              if (index < sessionDates.length()) sessionDates.remove(index)
+
+              val updatedHistory = sessions.filterIndexed { i, _ -> i != index }.joinToString("\n")
+              val legacyDates = if (prefs.contains("legacy_workout_dates_v1")) {
+                  prefs.getStringSet("legacy_workout_dates_v1", emptySet())?.toSet() ?: emptySet()
+              } else {
+                  prefs.getStringSet("workout_dates", emptySet())?.toSet() ?: emptySet()
+              }
+              val remainingDates = mutableSetOf<String>()
+              for (i in 0 until sessionDates.length()) {
+                  sessionDates.optString(i, "").takeIf { it.isNotBlank() }?.let { remainingDates.add(it) }
+              }
+              prefs.edit()
+                  .putString("history", updatedHistory)
+                  .putString("history_session_dates_v1", sessionDates.toString())
+                  .putStringSet("legacy_workout_dates_v1", legacyDates)
+                  .putStringSet("workout_dates", (legacyDates + remainingDates).toSet())
+                  .apply()
+              return updatedHistory
+          }
+          '''
+          if "private fun removeWorkoutHistoryEntry(" in s:
+              raise SystemExit("Helper eliminazione già presente: controllo interrotto")
+          s += helper
+          p.write_text(s, encoding="utf-8")
+          print("Storico aggiornato: eliminazione singola con conferma e sincronizzazione delle date tracciate.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
