@@ -2465,6 +2465,102 @@ jobs:
           print("HistoryScreen layout corrected without changing its inner scrolling list.")
           PY
 
+      - name: Handle Android back navigation and exit confirmation
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+
+          def add_import(name, anchor):
+              global s
+              if name not in s:
+                  if s.count(anchor) != 1:
+                      raise SystemExit(f"Import anchor not unique: {anchor}")
+                  s = s.replace(anchor, anchor + "\n" + name, 1)
+
+          add_import("import androidx.activity.compose.BackHandler", "import androidx.activity.compose.setContent")
+          add_import("import androidx.compose.runtime.LaunchedEffect", "import androidx.compose.runtime.*")
+          add_import("import androidx.compose.ui.platform.LocalContext", "import androidx.compose.ui.platform.LocalView")
+
+          drawer_state = '    var drawerOpen by remember { mutableStateOf(false) }'
+          if s.count(drawer_state) != 1:
+              raise SystemExit("Drawer state not found uniquely for back navigation")
+          navigation_state = drawer_state + '''
+              var previousTab by remember { mutableStateOf("HOME") }
+              var lastObservedTab by remember { mutableStateOf("HOME") }
+              var showExitConfirmation by remember { mutableStateOf(false) }
+              val hostActivity = LocalContext.current as? android.app.Activity
+              LaunchedEffect(tab) {
+                  if (tab != lastObservedTab) {
+                      previousTab = lastObservedTab
+                      lastObservedTab = tab
+                  }
+              }
+              BackHandler {
+                  when {
+                      drawerOpen -> drawerOpen = false
+                      tab != "HOME" -> tab = previousTab
+                      else -> showExitConfirmation = true
+                  }
+              }'''
+          s = s.replace(drawer_state, navigation_state, 1)
+
+          old_header_call = 'Header { drawerOpen = true }'
+          new_header_call = 'Header(tab, { if (tab != "HOME") tab = previousTab }, { drawerOpen = true })'
+          if s.count(old_header_call) != 1:
+              raise SystemExit("Header invocation not found uniquely")
+          s = s.replace(old_header_call, new_header_call, 1)
+
+          old_signature = 'private fun Header(onMenuClick: () -> Unit)'
+          new_signature = 'private fun Header(currentTab: String, onBackClick: () -> Unit, onMenuClick: () -> Unit)'
+          if s.count(old_signature) != 1:
+              raise SystemExit("Header declaration not found uniquely")
+          s = s.replace(old_signature, new_signature, 1)
+
+          menu_button = '        TextButton(onClick = onMenuClick, modifier = Modifier.size(44.dp))'
+          arrow_button = '''        if (currentTab != "HOME") {
+                  TextButton(onClick = onBackClick, modifier = Modifier.size(44.dp)) {
+                      Text("‹", color = Red, fontSize = 34.sp, fontWeight = FontWeight.Black)
+                  }
+              }
+          '''
+          if s.count(menu_button) != 1:
+              raise SystemExit("Header menu button not found uniquely")
+          s = s.replace(menu_button, arrow_button + menu_button, 1)
+
+          dialog = '''            if (showExitConfirmation) {
+                  AlertDialog(
+                      onDismissRequest = { showExitConfirmation = false },
+                      title = { Text("USCIRE DA GYM TRACKER?", color = White, fontWeight = FontWeight.Black) },
+                      text = { Text("Sei già nella schermata principale. Vuoi chiudere l'app?", color = Muted) },
+                      confirmButton = {
+                          TextButton(onClick = {
+                              showExitConfirmation = false
+                              hostActivity?.finish()
+                          }) { Text("ESCI", color = Red, fontWeight = FontWeight.Black) }
+                      },
+                      dismissButton = {
+                          TextButton(onClick = { showExitConfirmation = false }) {
+                              Text("ANNULLA", color = White, fontWeight = FontWeight.Bold)
+                          }
+                      },
+                      containerColor = Panel
+                  )
+              }
+          '''
+          if "if (showExitConfirmation) {" not in s:
+              overlay_anchor = '            if (drawerOpen) {'
+              if s.count(overlay_anchor) != 1:
+                  raise SystemExit("Drawer overlay insertion point not found uniquely")
+              s = s.replace(overlay_anchor, dialog + overlay_anchor, 1)
+
+          p.write_text(s, encoding="utf-8")
+          print("Android back now returns through visited tabs, closes the drawer first, and asks before exiting from Home.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
