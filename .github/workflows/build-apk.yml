@@ -2448,6 +2448,23 @@ jobs:
           echo "---- MainActivity.kt lines 555-575 ----"
           nl -ba "$FILE" | sed -n '555,575p'
 
+      - name: Fix history screen layout scope
+        run: |
+          set -euo pipefail
+          python3 - <<'PY'
+          from pathlib import Path
+          import os
+          p = Path(os.environ["PROJECT_DIR"]) / "app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          s = p.read_text(encoding="utf-8")
+          old = 'Column(Modifier.fillMaxWidth().weight(1f, fill = false)) {'
+          new = 'Column(Modifier.fillMaxWidth()) {'
+          if s.count(old) != 1:
+              raise SystemExit(f"HistoryScreen outer layout anchor expected once, found {s.count(old)}")
+          s = s.replace(old, new, 1)
+          p.write_text(s, encoding="utf-8")
+          print("HistoryScreen layout corrected without changing its inner scrolling list.")
+          PY
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
