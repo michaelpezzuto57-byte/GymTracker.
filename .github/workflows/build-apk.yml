@@ -2483,7 +2483,7 @@ jobs:
 
           add_import("import androidx.activity.compose.BackHandler", "import androidx.activity.compose.setContent")
           add_import("import androidx.compose.runtime.LaunchedEffect", "import androidx.compose.runtime.*")
-          add_import("import androidx.compose.ui.platform.LocalContext", "import androidx.compose.ui.platform.LocalView")
+          add_import("import androidx.compose.ui.platform.LocalContext", "import androidx.compose.runtime.*")
 
           drawer_state = '    var drawerOpen by remember { mutableStateOf(false) }'
           if s.count(drawer_state) != 1:
