@@ -2442,6 +2442,12 @@ jobs:
           print("Storico aggiornato: eliminazione singola con conferma e sincronizzazione delle date tracciate.")
           PY
 
+      - name: Diagnose Kotlin compile location
+        run: |
+          FILE="$PROJECT_DIR/app/src/main/java/it/gymtracker/app/MainActivity.kt"
+          echo "---- MainActivity.kt lines 555-575 ----"
+          nl -ba "$FILE" | sed -n '555,575p'
+
       - name: Build APK
         env:
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
